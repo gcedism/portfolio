@@ -3,11 +3,11 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 from datetime import datetime as dt
-from Securities import Securities
-from Plotting import Basic_plot
+from .securities import securities
+from .plotting import basic_plot
 
 
-class Portfolio:
+class portfolio:
 
   def __init__(self, name: str, initial_pricing_date, blotters):
     '''
@@ -45,7 +45,7 @@ class Portfolio:
     self._breakdowns()
 
     print('\rCalcuating Sub Portfolios...', end=' ' * 30, flush=True)
-    self.bonds = Bonds(self.port[self.port['asset_class'] == 'bond'])
+    self.bonds = bonds(self.port[self.port['asset_class'] == 'bond'])
     self.equities = self.port[self.port['asset_class'] == 'equities']
 
     print('\rDone...', end=' ' * 30, flush=True)
@@ -60,35 +60,35 @@ class Portfolio:
 
     blotter['asset_class'] = blotter.index.map(Securities.funds['asset_class'])
     A = blotter.index
-    B = Securities.equities.index
+    B = securities.equities.index
     c = np.where(pd.Index(pd.unique(B)).get_indexer(A) >= 0)[0]
     blotter.loc[:, 'asset_class'].iloc[c] = 'equity'
     A = blotter.index
-    B = Securities.bonds.index
+    B = securities.bonds.index
     c = np.where(pd.Index(pd.unique(B)).get_indexer(A) >= 0)[0]
     blotter.loc[:, 'asset_class'].iloc[c] = 'bond'
 
     return blotter.groupby('asset_class').sum(numeric_only=True)
 
   def updatePort(self, pricing_dt):
-    Securities.update(pricing_dt)
+    securities.update(pricing_dt)
     blotter = self.blotter[self.blotter['date'] <= pricing_dt]
 
     port = blotter.groupby('id').sum(numeric_only=True)
     port = self._add_column(port, 'price')
     port = self._add_column(port, 'currency')
     port = port[['quantity', 'cost_price', 'price', 'currency']]
-    port['ccy_price'] = port['currency'].map(Securities.fx['price'])
+    port['ccy_price'] = port['currency'].map(securities.fx['price'])
     port['mtm'] = port['quantity'] * port['price'] / port['ccy_price']
-    port['asset_class'] = port.index.map(Securities.funds['asset_class'])
+    port['asset_class'] = port.index.map(securities.funds['asset_class'])
 
     A = port.index
-    B = Securities.equities.index
+    B = securities.equities.index
     c = np.where(pd.Index(pd.unique(B)).get_indexer(A) >= 0)[0]
     port.loc[:, 'asset_class'].iloc[c] = 'equity'
 
     A = port.index
-    B = Securities.bonds.index
+    B = securities.bonds.index
     c = np.where(pd.Index(pd.unique(B)).get_indexer(A) >= 0)[0]
     port.loc[:, 'asset_class'].iloc[c] = 'bond'
 
@@ -100,17 +100,17 @@ class Portfolio:
     self.port = port
 
   def updateCash(self, pricing_dt):
-    Securities.update(pricing_dt)
+    securities.update(pricing_dt)
     cash_blotter = self.cash_blotter[self.cash_blotter['date'] <= pricing_dt]
     blotter = self.blotter[self.blotter['date'] <= pricing_dt]
 
-    blotter['ccy_price'] = blotter['currency'].map(Securities.fx['price'])
+    blotter['ccy_price'] = blotter['currency'].map(securities.fx['price'])
     blotter['cash_mvmt'] = -blotter['quantity'] * blotter[
       'cost_price'] / blotter['ccy_price']
     blotter_cash = blotter.groupby('currency').sum(numeric_only=True)
 
     cash = cash_blotter.groupby('currency').sum(numeric_only=True)
-    cash['ccy_price'] = cash.index.map(Securities.fx['price'])
+    cash['ccy_price'] = cash.index.map(securities.fx['price'])
     cash['mtm'] = cash['amount'] / cash['ccy_price']
 
     self.cash = cash['mtm'].add(blotter_cash['cash_mvmt'], fill_value=0)
@@ -143,9 +143,9 @@ class Portfolio:
 
   @staticmethod
   def _add_column(table, column):
-    table['eq_aux'] = table.index.map(Securities.equities[column])
-    table['fnds_aux'] = table.index.map(Securities.funds[column])
-    table['bonds_aux'] = table.index.map(Securities.bonds[column])
+    table['eq_aux'] = table.index.map(securities.equities[column])
+    table['fnds_aux'] = table.index.map(securities.funds[column])
+    table['bonds_aux'] = table.index.map(securities.bonds[column])
 
     m1 = table['eq_aux'].notna()
     m2 = table['fnds_aux'].notna()
@@ -163,7 +163,7 @@ class Portfolio:
     return self._name
 
 
-class Bonds:
+class bonds:
   '''
   Class with a portfolio of Bonds
   methods :
@@ -191,7 +191,7 @@ class Bonds:
     bonds[[
       'name', 'maturity', 'cpn', 'yield', 'dur', 'spread', 'country', 'sector',
       'rating', 'ranking', 'Bond'
-    ]] = Securities.bonds[[
+    ]] = securities.bonds[[
       'name', 'maturity', 'cpn', 'yield', 'dur', 'spread', 'country', 'sector',
       'rating', 'ranking', 'Bond'
     ]]

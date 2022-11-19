@@ -1,7 +1,7 @@
 import matplotlib.pyplot as plt
 
 
-class Basic_plot:
+class basic_plot:
   '''
   Defines a Basic Plotting Style
   '''

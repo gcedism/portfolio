@@ -1,6 +1,6 @@
 import pandas as pd
 from pandas.tseries.offsets import CDay
-from Portfolio import Portfolio
+import portfolio as pf
 
 from datetime import datetime as dt
 from datetime import timedelta as td
@@ -41,10 +41,10 @@ for bl in blotters_list:
     lambda x: dt.strptime(x, '%Y-%m-%d').date())
   blotters[bl] = blotters[bl][blotters[bl]['account'].isin(sel_acc)]
 
-port = Portfolio('Main Portfolio', pricing_dt, blotters)
+port = pf.portfolio('Main Portfolio', pricing_dt, blotters)
 
 start = dt(2023, 1, 1).date()
 end = dt(2024, 1, 1).date()
-port.print_currencies()
+print(port.bonds.data)
 
 # '{:,.2f}'.format(shared.port.assets['amount'].sum()

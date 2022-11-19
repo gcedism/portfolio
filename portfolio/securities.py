@@ -1,10 +1,10 @@
 import pandas as pd
 from datetime import datetime as dt
 from _data.get_prices import hist
-from Bond import Bond
+from .bond import bond
 
 
-class Securities:
+class securities:
   bonds = pd.read_csv('_data/bonds.csv', encoding='UTF-8', index_col=0)
   bonds.loc[:, 'maturity'] = bonds.loc[:, 'maturity'].map(
     lambda x: dt.strptime(x, '%Y-%m-%d').date())
@@ -18,7 +18,7 @@ class Securities:
                                          if x.name in hist.columns else 100,
                                          axis=1)
     cls.bonds['Bond'] = cls.bonds.apply(
-      lambda x: Bond(x['maturity'], x['cpn'], x['price'], pricing_dt), axis=1)
+      lambda x: bond(x['maturity'], x['cpn'], x['price'], pricing_dt), axis=1)
     cls.bonds[['yield', 'spread', 'dur']] = cls.bonds.apply(
       lambda x: pd.Series(
         [x['Bond'].y * 100, x['Bond'].spread * 10000, x['Bond'].duration],
