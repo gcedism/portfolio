@@ -1,15 +1,35 @@
 import pandas as pd
-import matplotlib.pyplot as plt
-
+from pandas.tseries.offsets import CDay
 from Portfolio import Portfolio
 
 from datetime import datetime as dt
 from datetime import timedelta as td
 
 pd.set_option('mode.chained_assignment', None)
+'''
+Main Procedure to gatter necessary data and create a portfolio
+Blotters : 
+  blotter : csv File with the following structure
+    date : date of the transaction (Y-m-d format)
+    id : id of the security
+    quantity : quantity traded (FV / 100 for bonds)
+    cost_price : price paid (received) for the trade
+    account : string to specific account managed
+  blotter_cash : DataFrame with list of cash movements in the structure : 
+    date : date of the transaction (Y-m-d format)
+    currency : currency in three letters code
+    amount : amount transfered
+    account : string to specific account managed
+    * each pure FX transaction will be displayed into two lines 
+    representing a credit and a debit transaction
+    ** cash movements from secutiries traded not necessary
+  blotter_derivatives :
+    To be Implemented
+'''
 
 ACCOUNTS = ['port_1', 'port_2', 'port_3', 'port_4']
-pricing_dt = dt.now().date() - td(days=1)
+sel_acc = ACCOUNTS
+pricing_dt = (dt.now() - CDay(1)).date()
 
 blotters_list = ['blotter', 'cash_blotter']
 blotters = {}
@@ -19,11 +39,12 @@ for bl in blotters_list:
                              index_col=0)
   blotters[bl].loc[:, 'date'] = blotters[bl].loc[:, 'date'].apply(
     lambda x: dt.strptime(x, '%Y-%m-%d').date())
+  blotters[bl] = blotters[bl][blotters[bl]['account'].isin(sel_acc)]
 
 port = Portfolio('Main Portfolio', pricing_dt, blotters)
 
 start = dt(2023, 1, 1).date()
 end = dt(2024, 1, 1).date()
-print(port.bonds.cash_projection(start, end))
+port.print_currencies()
 
 # '{:,.2f}'.format(shared.port.assets['amount'].sum()

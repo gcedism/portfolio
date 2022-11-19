@@ -1,8 +1,10 @@
 import numpy as np
 import pandas as pd
+import matplotlib.pyplot as plt
 
 from datetime import datetime as dt
 from Securities import Securities
+from Plotting import Basic_plot
 
 
 class Portfolio:
@@ -48,26 +50,25 @@ class Portfolio:
 
     print('\rDone...', end=' ' * 30, flush=True)
 
-  def movements(self, start_date, end_date):
+  def movements(self, start_date: dt.date, end_date: dt.date):
     blotter = self.blotter[(self.blotter['date'] > start_date)
                            & (self.blotter['date'] <= end_date)]
-    blotter = self.__add_column(blotter, 'price')
+    blotter = self._add_column(blotter, 'price')
     blotter['ccy_price'] = blotter['currency'].map(self.securities.fx['price'])
     blotter[
       'mtm'] = blotter['quantity'] * blotter['price'] / blotter['ccy_price']
 
-    blotter['asset_class'] = blotter.index.map(
-      self.securities.funds['asset_class'])
+    blotter['asset_class'] = blotter.index.map(Securities.funds['asset_class'])
     A = blotter.index
-    B = self.securities.equities.index
+    B = Securities.equities.index
     c = np.where(pd.Index(pd.unique(B)).get_indexer(A) >= 0)[0]
     blotter.loc[:, 'asset_class'].iloc[c] = 'equity'
     A = blotter.index
-    B = self.securities.bonds.index
+    B = Securities.bonds.index
     c = np.where(pd.Index(pd.unique(B)).get_indexer(A) >= 0)[0]
     blotter.loc[:, 'asset_class'].iloc[c] = 'bond'
 
-    return blotter.groupby('asset_class').sum()
+    return blotter.groupby('asset_class').sum(numeric_only=True)
 
   def updatePort(self, pricing_dt):
     Securities.update(pricing_dt)
@@ -132,6 +133,13 @@ class Portfolio:
     assets = pd.DataFrame.from_dict(asset, orient='index', columns=['amount'])
     assets['%'] = assets['amount'] / assets['amount'].sum()
     self.assets = assets
+
+  # Not Working
+  # @Basic_plot
+  # def print_currencies(*args, **kwargs):
+  #   f, ax = plt.subplots(figsize=(5, 5))
+  #   ax.pie(self.currencies['%'])
+  #   return f, ax
 
   @staticmethod
   def _add_column(table, column):
@@ -206,8 +214,8 @@ class Bonds:
       axis=1)
     ints = pd.concat([x['flow'] for x in ints]).groupby('dates').sum()
     mats = self.data[(self.data['maturity'] > initial_date)
-                 & (self.data['maturity'] <= end_date)].set_index(
-                   'maturity').loc[:, 'quantity'] * 100
+                     & (self.data['maturity'] <= end_date)].set_index(
+                       'maturity').loc[:, 'quantity'] * 100
     mats.index.set_names('dates', inplace=True)
     mats = mats.groupby('dates').sum()
 
