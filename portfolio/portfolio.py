@@ -3,11 +3,11 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 from datetime import datetime as dt
-from .securities import securities
+from .securities import Securities
 from .plotting import basic_plot
 
 
-class portfolio:
+class Portfolio:
 
   def __init__(self, name: str, initial_pricing_date, blotters):
     '''
@@ -15,7 +15,7 @@ class portfolio:
       name : string with the name of the portfolio
       initial_pricing_date : datetime date object
       blotters: list with two different blotters :
-        blotter : DataFrame with trades in different securities with the structure :
+        blotter : DataFrame with trades in different Securities with the structure :
           date : date of the transaction (datetime date object)
           id : id of the security
           quantity : quantity traded (FV / 100 for bonds)
@@ -54,41 +54,41 @@ class portfolio:
     blotter = self.blotter[(self.blotter['date'] > start_date)
                            & (self.blotter['date'] <= end_date)]
     blotter = self._add_column(blotter, 'price')
-    blotter['ccy_price'] = blotter['currency'].map(self.securities.fx['price'])
+    blotter['ccy_price'] = blotter['currency'].map(self.Securities.fx['price'])
     blotter[
       'mtm'] = blotter['quantity'] * blotter['price'] / blotter['ccy_price']
 
     blotter['asset_class'] = blotter.index.map(Securities.funds['asset_class'])
     A = blotter.index
-    B = securities.equities.index
+    B = Securities.equities.index
     c = np.where(pd.Index(pd.unique(B)).get_indexer(A) >= 0)[0]
     blotter.loc[:, 'asset_class'].iloc[c] = 'equity'
     A = blotter.index
-    B = securities.bonds.index
+    B = Securities.bonds.index
     c = np.where(pd.Index(pd.unique(B)).get_indexer(A) >= 0)[0]
     blotter.loc[:, 'asset_class'].iloc[c] = 'bond'
 
     return blotter.groupby('asset_class').sum(numeric_only=True)
 
   def updatePort(self, pricing_dt):
-    securities.update(pricing_dt)
+    Securities.update(pricing_dt)
     blotter = self.blotter[self.blotter['date'] <= pricing_dt]
 
     port = blotter.groupby('id').sum(numeric_only=True)
     port = self._add_column(port, 'price')
     port = self._add_column(port, 'currency')
     port = port[['quantity', 'cost_price', 'price', 'currency']]
-    port['ccy_price'] = port['currency'].map(securities.fx['price'])
+    port['ccy_price'] = port['currency'].map(Securities.fx['price'])
     port['mtm'] = port['quantity'] * port['price'] / port['ccy_price']
-    port['asset_class'] = port.index.map(securities.funds['asset_class'])
+    port['asset_class'] = port.index.map(Securities.funds['asset_class'])
 
     A = port.index
-    B = securities.equities.index
+    B = Securities.equities.index
     c = np.where(pd.Index(pd.unique(B)).get_indexer(A) >= 0)[0]
     port.loc[:, 'asset_class'].iloc[c] = 'equity'
 
     A = port.index
-    B = securities.bonds.index
+    B = Securities.bonds.index
     c = np.where(pd.Index(pd.unique(B)).get_indexer(A) >= 0)[0]
     port.loc[:, 'asset_class'].iloc[c] = 'bond'
 
@@ -100,17 +100,17 @@ class portfolio:
     self.port = port
 
   def updateCash(self, pricing_dt):
-    securities.update(pricing_dt)
+    Securities.update(pricing_dt)
     cash_blotter = self.cash_blotter[self.cash_blotter['date'] <= pricing_dt]
     blotter = self.blotter[self.blotter['date'] <= pricing_dt]
 
-    blotter['ccy_price'] = blotter['currency'].map(securities.fx['price'])
+    blotter['ccy_price'] = blotter['currency'].map(Securities.fx['price'])
     blotter['cash_mvmt'] = -blotter['quantity'] * blotter[
       'cost_price'] / blotter['ccy_price']
     blotter_cash = blotter.groupby('currency').sum(numeric_only=True)
 
     cash = cash_blotter.groupby('currency').sum(numeric_only=True)
-    cash['ccy_price'] = cash.index.map(securities.fx['price'])
+    cash['ccy_price'] = cash.index.map(Securities.fx['price'])
     cash['mtm'] = cash['amount'] / cash['ccy_price']
 
     self.cash = cash['mtm'].add(blotter_cash['cash_mvmt'], fill_value=0)
@@ -143,9 +143,9 @@ class portfolio:
 
   @staticmethod
   def _add_column(table, column):
-    table['eq_aux'] = table.index.map(securities.equities[column])
-    table['fnds_aux'] = table.index.map(securities.funds[column])
-    table['bonds_aux'] = table.index.map(securities.bonds[column])
+    table['eq_aux'] = table.index.map(Securities.equities[column])
+    table['fnds_aux'] = table.index.map(Securities.funds[column])
+    table['bonds_aux'] = table.index.map(Securities.bonds[column])
 
     m1 = table['eq_aux'].notna()
     m2 = table['fnds_aux'].notna()
@@ -191,7 +191,7 @@ class bonds:
     bonds[[
       'name', 'maturity', 'cpn', 'yield', 'dur', 'spread', 'country', 'sector',
       'rating', 'ranking', 'Bond'
-    ]] = securities.bonds[[
+    ]] = Securities.bonds[[
       'name', 'maturity', 'cpn', 'yield', 'dur', 'spread', 'country', 'sector',
       'rating', 'ranking', 'Bond'
     ]]

@@ -4,7 +4,7 @@ from datetime import datetime as dt
 from datetime import timedelta as td
 
 
-class bond():
+class Bond():
 
   us_zero = pd.read_csv('_data/us_zero.csv', index_col=0)
   us_zero.index = us_zero.index.map(
@@ -91,7 +91,7 @@ class bond():
     ## ***********************************************************
 
     _cshf = self.cshf.join(
-      bond.us_zero['df'],
+      Bond.us_zero['df'],
       how='outer').sort_index().interpolate().loc[self.cshf.index]
     _cshf['zero_y'] = _cshf.apply(lambda x:
                                   (1 / x['df'] - 1) * 360 / x['days'],
