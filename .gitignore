@@ -5,5 +5,9 @@ __pycache__
 
 # Temp stuff
 Test.py
+
+#Private Stuff
+p_funds_prices.csv
 funds.csv
 funds_prices.csv
+p_get_prices.py
