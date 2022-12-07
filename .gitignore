@@ -4,7 +4,7 @@ __pycache__
 .DS_Store
 
 # Temp stuff
-Test.py
+Test*
 
 #Private Stuff
 p_funds_prices.csv

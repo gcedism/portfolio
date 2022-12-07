@@ -13,7 +13,7 @@ from .plotting import basic_plot
 
 class Portfolio:
 
-    def __init__(self, name: str, initial_pricing_date:date, blotters):
+    def __init__(self, name:str, initial_pricing_date:date, blotters:list[pd.DataFrame]):
         """
         Basic Portfolio Structure 
         :parameters:
