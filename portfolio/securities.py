@@ -4,6 +4,7 @@ from datetime import date
 from .._data.p_get_prices import hist # using private import
 # from .._data._get_prices import hist
 from .bond import Bond
+from .options import SPYOption
 
 FOLDER = __file__[:-len('portfolio/securities.py')]
 
@@ -18,6 +19,8 @@ class Securities:
     equities = pd.read_csv(FOLDER + '_data/equities.csv', encoding='UTF-8', index_col=0)
 
     funds = pd.read_csv(FOLDER + '_data/funds.csv', encoding='UTF-8', index_col=0)
+    
+    options = pd.read_csv(FOLDER + '_data/options.csv', encoding='UTF-8', index_col=0)
 
 
     @classmethod
@@ -56,3 +59,16 @@ class Securities:
         cls.fx['price'] = cls.fx.apply(lambda x: hist.loc[pricing_dt, x.name]
                                        if x.name in hist.columns else 1, axis=1)
         cls.fx.set_index('id', inplace=True)
+        
+        cls.options['price'] = cls.options.apply(lambda x: hist.loc[pricing_dt, x.name]
+                                         if x.name in hist.columns else 1,
+                                         axis=1)
+        cls.options['Option'] = cls.options.index.map(lambda x: SPYOption(x, pricing_dt))
+        for i in range(cls.options.shape[0]) :
+            cls.options.iloc[i]['Option'].price = cls.options.iloc[i]['price']
+    
+        
+        
+        
+        
+        

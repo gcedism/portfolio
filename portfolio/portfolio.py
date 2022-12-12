@@ -88,29 +88,13 @@ class Portfolio:
         print('\rCalcuating Sub Portfolios...', end=' ' * 30, flush=True)
         self._bonds = Bonds(self.port[self.port['asset_class'] == 'bond']).data
         self._equities = self.port[self.port['asset_class'] == 'equities']
-
+        _options = self.port[self.port['asset_class'] == 'option']
+        _options['Option'] = _options.index.map(Securities.options['Option'])
+        self._options = Options(_options)
+        
         print('\rDone...', end=' ' * 30, flush=True)
 
-    def movements(self, start_date: dt.date, end_date: dt.date):
-        blotter = self._blotter[(self.blotter['date'] > start_date)
-                           & (self.blotter['date'] <= end_date)]
-        blotter = self._add_column(blotter, 'price')
-        blotter['ccy_price'] = blotter['currency'].map(Securities.fx['price'])
-        blotter['mtm'] = blotter['quantity'] * blotter['price'] / blotter['ccy_price']
-
-        blotter['asset_class'] = blotter.index.map(Securities.funds['asset_class'])
-        A = blotter.index
-        B = Securities.equities.index
-        c = np.where(pd.Index(pd.unique(B)).get_indexer(A) >= 0)[0]
-        
-        blotter.loc[:, 'asset_class'].iloc[c] = 'equity'
-        A = blotter.index
-        B = Securities.bonds.index
-        c = np.where(pd.Index(pd.unique(B)).get_indexer(A) >= 0)[0]
-        
-        blotter.loc[:, 'asset_class'].iloc[c] = 'bond'
-
-        return blotter.groupby('asset_class').sum(numeric_only=True)
+    
 
     def updatePort(self, pricing_dt:date):
         """
@@ -119,7 +103,7 @@ class Portfolio:
 
         Securities.update(pricing_dt)
         blotter = self._blotter.loc[self._blotter['date'] <= pricing_dt]
-
+        
         port = blotter.groupby('id').sum(numeric_only=True)
         port = self._add_column(port, 'price')
         port = self._add_column(port, 'currency')
@@ -139,10 +123,10 @@ class Portfolio:
         c = np.where(pd.Index(pd.unique(B)).get_indexer(A) >= 0)[0]
         port.loc[:, 'asset_class'].iloc[c] = 'bond'
 
-        # A = port.index
-        # B = options.index
-        # c = np.where(pd.Index(pd.unique(B)).get_indexer(A) >= 0)[0]
-        # port.loc[:, 'asset_class'].iloc[c] = 'option'
+        A = port.index
+        B = Securities.options.index
+        c = np.where(pd.Index(pd.unique(B)).get_indexer(A) >= 0)[0]
+        port.loc[:, 'asset_class'].iloc[c] = 'option'
 
         self._port = port
 
@@ -203,16 +187,20 @@ class Portfolio:
 
     @staticmethod
     def _add_column(table: pd.DataFrame, column: str) -> pd.DataFrame:
+        
         table['eq_aux'] = table.index.map(Securities.equities[column])
         table['fnds_aux'] = table.index.map(Securities.funds[column])
         table['bonds_aux'] = table.index.map(Securities.bonds[column])
+        table['options_aux'] = table.index.map(Securities.options[column])
+        
 
         m1 = table['eq_aux'].notna()
         m2 = table['fnds_aux'].notna()
         m3 = table['bonds_aux'].notna()
+        m4 = table['options_aux'].notna()
 
-        table[column] = np.select([m1, m2, m3], [table['eq_aux'], table['fnds_aux'], table['bonds_aux']], default=np.nan)
-        table.drop(['eq_aux', 'fnds_aux', 'bonds_aux'], axis=1, inplace=True)
+        table[column] = np.select([m1, m2, m3, m4], [table['eq_aux'], table['fnds_aux'], table['bonds_aux'], table['options_aux']], default=np.nan)
+        # table.drop(['eq_aux', 'fnds_aux', 'bonds_aux', 'options_aux'], axis=1, inplace=True)
 
         return table
 
@@ -270,6 +258,32 @@ class Portfolio:
                     "mtm": "{:,.2f}"
                     })
         return display_cash
+    
+    #To be Used in the Future for calculating performance
+    def movements(self, start_date: dt.date, end_date: dt.date):
+        blotter = self._blotter[(self.blotter['date'] > start_date)
+                           & (self.blotter['date'] <= end_date)]
+        blotter = self._add_column(blotter, 'price')
+        blotter['ccy_price'] = blotter['currency'].map(Securities.fx['price'])
+        blotter['mtm'] = blotter['quantity'] * blotter['price'] / blotter['ccy_price']
+
+        blotter['asset_class'] = blotter.index.map(Securities.funds['asset_class'])
+        A = blotter.index
+        B = Securities.equities.index
+        c = np.where(pd.Index(pd.unique(B)).get_indexer(A) >= 0)[0]
+        blotter.loc[:, 'asset_class'].iloc[c] = 'equity'
+        
+        A = blotter.index
+        B = Securities.bonds.index
+        c = np.where(pd.Index(pd.unique(B)).get_indexer(A) >= 0)[0]
+        blotter.loc[:, 'asset_class'].iloc[c] = 'bond'
+        
+        A = blotter.index
+        B = Securities.options.index
+        c = np.where(pd.Index(pd.unique(B)).get_indexer(A) >= 0)[0]
+        blotter.loc[:, 'asset_class'].iloc[c] = 'option'
+
+        return blotter.groupby('asset_class').sum(numeric_only=True)
 
 
 class Bonds:
@@ -340,3 +354,61 @@ class Bonds:
     @property
     def data(self):
         return self._data
+
+class Options :
+    """
+    Class with a portfolio of Options for a particular asset
+    :methods:
+        Net Delta
+        Net Gamma 
+        Gamma Matrix
+        Net vega
+        Net Theta
+    """
+    
+    def __init__(self, options:pd.DataFrame) :
+        """
+        :parameters:
+            options : List, Option,
+                List of Options
+        """
+                
+        self._table = pd.DataFrame([{'tenor' : round(opt._t, 2),
+                                     'c_p' : opt._c_p,
+                                     'strike' : opt._K,
+                                     'delta' : round(opt.delta, 2),
+                                     'vol' : round(opt.vol, 2),
+                                     'gamma_up' : round(opt.gamma_up, 2),
+                                     'gamma_down' : round(opt.gamma_down, 2),
+                                     'vega_up' : round(opt.vega_up, 2),
+                                     'vega_down' : round(opt.vega_down, 2),
+                                     'theta' : round(opt.theta, 2),
+                                    }
+                                    for opt in options['Option']]).set_index('tenor')
+        self.calc_matrix()
+        
+    def calc_matrix(self) :
+        
+        bins = [0, 0.125, 0.375, 0.5, 0.675, 0.875, 1]
+        labels =[0.10, 0.25, 0.425, 0.575, 0.75, 0.9]
+        self._table['delta_buckets'] = pd.cut(self._table['delta'], bins, labels=labels)
+        self._gammaUpMatrix = self._table.pivot_table(values='gamma_up',
+                                                      index='delta_buckets',
+                                                      columns='tenor',
+                                                      aggfunc='sum')
+        self._gammaDownMatrix = self._table.pivot_table(values='gamma_down',
+                                                        index='delta_buckets',
+                                                        columns='tenor',
+                                                        aggfunc='sum')
+        
+    @property
+    def table(self) :
+        return self._table
+        
+    @property
+    def gammaUpMatrix(self) :
+        return self._gammaUpMatrix
+    
+    @property
+    def gammaDownMatrix(self) :
+        return self._gammaDownMatrix
