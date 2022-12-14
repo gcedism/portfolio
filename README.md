@@ -30,9 +30,14 @@ Portfolio needs to received some pricing feeder for the securities and a Blotter
 
 ### Some screenshots : 
 
-![Performance Attribution](https://github.com/gcedism/portfolio/blob/main/fig/Screenshot%202022-11-04%20at%2008.19.11.png "Performance Attribution")
+Options
+
+![Options Greek management](https://github.com/gcedism/portfolio/blob/main/docs/options%20port.png "Options")
+
+Performance Attribution
+![Performance Attribution](https://github.com/gcedism/portfolio/blob/main/docs/perf%20attribution.png "Performance Attribution")
+
 
 Total Performance
-
-![Performance](https://github.com/gcedism/portfolio/blob/main/fig/Screenshot%202022-11-04%20at%2008.19.24.png "Performance")
+![Performance](https://github.com/gcedism/portfolio/blob/main/docs/performance.png "Performance")
 
