@@ -1,3 +1,6 @@
+import pandas as pd
+import numpy as np
+
 from IPython.display import display_html
 from itertools import chain,cycle
     
@@ -18,3 +21,10 @@ def display_side_by_side_title(*args, titles=cycle([''])):
         html_str+=df.to_html().replace('table','table style="display:inline"')
         html_str+='</td></th>'
     display_html(html_str, raw=True)
+    
+def interpolate(coord:tuple, table:pd.DataFrame) -> float :
+    _table = table.copy()
+    _table.loc[coord[0], coord[1]] = np.NaN
+    _table = _table[sorted(_table.columns)].sort_index().interpolate(axis=0).interpolate(axis=1)
+    
+    return _table.loc[coord[0], coord[1]]

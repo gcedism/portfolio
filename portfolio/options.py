@@ -106,8 +106,22 @@ class Option :
         self.calc_vega_up()
         self.calc_vega_down()
         self.calc_mod_theta()
-        print('Greeks updated')
-            
+    
+    @property
+    def spot(self):
+        return self._S
+    @spot.setter
+    def spot(self, _spot):
+        self._S = _spot
+        # Not yet implemented, because when spot changes, the vol needs to be interpolated
+        # self.calc_price()
+        # self.calc_delta()
+        # self.calc_gamma_up()
+        # self.calc_gamma_down()
+        # self.calc_vega_up()
+        # self.calc_vega_down()
+        # self.calc_mod_theta()
+    
     def calc_delta(self) :
         N = scipy.stats.norm.cdf
         d1 = (log(self._S/self._K) + (self._r+self._vol**2/2)*self._t) / (self._vol*sqrt(self._t))
@@ -230,8 +244,18 @@ class Option :
     @property
     def vol(self) :
         return self._vol
-            
-
+    @vol.setter
+    def vol(self, new_vol) :
+        self._vol = new_vol
+        self.calc_price()
+        self.calc_delta()
+        self.calc_gamma_up()
+        self.calc_gamma_down()
+        self.calc_vega_up()
+        self.calc_vega_down()
+        self.calc_mod_theta()
+        
+    
 class SPYOption(Option) :
     
     def __init__(self, code:str, pricing_dt:date) :
@@ -241,7 +265,7 @@ class SPYOption(Option) :
             self._c_p = 'call'
         else : 
             self._c_p = 'put'
-        self._S = 394.48 # To be obtained
+        self._S = 394.48 # I think you can remove that
         self._K = float(code[-6:] ) / 1000
         self._r = 0.04 # To be obtained
         self._i = 0.02 # To be calculated

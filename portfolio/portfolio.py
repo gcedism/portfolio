@@ -10,6 +10,8 @@ from datetime import date
 
 from .securities import Securities
 from .plotting import basic_plot
+from .utils.volatility import vol_curve
+from .utils.utils import interpolate
 
 class Portfolio:
 
@@ -76,23 +78,24 @@ class Portfolio:
         self._blotter = self._add_column(blotters['blotter'], 'currency')
         self._cash_blotter = blotters['cash_blotter']
 
-        print('\rUpdating portfolio...', end=' ' * 30, flush=True)
+        print('\rUpdating portfolio...', flush=True)
         self.updatePort(initial_pricing_date)
 
-        print('\rUpdating Cash...', end=' ' * 30, flush=True)
+        print('\rUpdating Cash...', flush=True)
         self.updateCash(initial_pricing_date)
 
-        print('\rCalculating Breakdowns...', end=' ' * 30, flush=True)
+        print('\rCalculating Breakdowns...', flush=True)
         self._breakdowns()
 
-        print('\rCalcuating Sub Portfolios...', end=' ' * 30, flush=True)
+        print('\rCalcuating Sub Portfolios...', flush=True)
         self._bonds = Bonds(self.port[self.port['asset_class'] == 'bond']).data
         self._equities = self.port[self.port['asset_class'] == 'equities']
         _options = self.port[self.port['asset_class'] == 'option']
-        _options['Option'] = _options.index.map(Securities.options['Option'])
-        self._options = Options(_options)
+        if not _options.empty :
+            _options['Option'] = _options.index.map(Securities.options['Option'])
+            self._options = Options(_options)
         
-        print('\rDone...', end=' ' * 30, flush=True)
+        print('\rDone...', flush=True)
 
     
 
@@ -249,6 +252,10 @@ class Portfolio:
     @property
     def equities(self):
         return self._equities
+    
+    @property
+    def options(self) :
+        return self._options
         
     @property
     def cash(self):
@@ -369,46 +376,104 @@ class Options :
     def __init__(self, options:pd.DataFrame) :
         """
         :parameters:
-            options : List, Option,
+            options : pd.DataFrame, Option,
                 List of Options
         """
-                
-        self._table = pd.DataFrame([{'tenor' : round(opt._t, 2),
-                                     'c_p' : opt._c_p,
-                                     'strike' : opt._K,
-                                     'delta' : round(opt.delta, 2),
-                                     'vol' : round(opt.vol, 2),
-                                     'gamma_up' : round(opt.gamma_up, 2),
-                                     'gamma_down' : round(opt.gamma_down, 2),
-                                     'vega_up' : round(opt.vega_up, 2),
-                                     'vega_down' : round(opt.vega_down, 2),
-                                     'theta' : round(opt.theta, 2),
-                                    }
-                                    for opt in options['Option']]).set_index('tenor')
-        self.calc_matrix()
         
+        self._spot = options['Option'][0].spot
+        self._options = options
+        self.expandDetails()
+        
+    def expandDetails(self):
+        self._options[['price', 'tenor', 'c_p', 'strike', 'delta', 'delta$', 'vol',
+                       'gamma_up', 'gamma_down', 'vega_up', 'vega_down', 'theta']
+                     ] = self._options.apply(lambda x: pd.Series(
+            [x['Option'].price,
+             x['Option']._t, x['Option']._c_p, x['Option']._K,
+             x['Option'].delta,
+             x['Option'].delta * x['Option'].spot * x['quantity'] * x['ccy_price'],
+             x['Option'].vol,
+             x['Option'].gamma_up * x['Option'].spot * x['quantity'] * x['ccy_price'],
+             x['Option'].gamma_down * x['Option'].spot * x['quantity'] * x['ccy_price'],
+             x['Option'].vega_up * x['quantity'],
+             x['Option'].vega_down * x['quantity'],
+             x['Option'].theta * x['quantity']],
+            index=['price', 'tenor', 'c_p', 'strike', 'delta', 'delta$', 'vol',
+                   'gamma_up', 'gamma_down', 'vega_up',
+                   'vega_down', 'theta']), axis =1)
+            
+        self._options['mtm'] = self._options['quantity'] * self._options['price']
+        
+        self._totalGamma = (self._options['gamma_up'].sum() + self._options['gamma_down'].sum())/ 2
+        self._totalDelta = self._options['delta$'].sum()
+        self._totalTheta = self._options['theta'].sum()
+        self._mtm = self._options['mtm'].sum()
+        self.calc_matrix()
+    
+    def updatePrices(self, prices:dict) :
+        self._options['price'] = self._options.index.map(prices)
+        for opt, p in zip(self._options['Option'], self._options['price']) :
+            opt.price = p
+    
+    def updateSpot(self, spot) :
+        r = 0.04
+        i = 0.02
+        pricing_dt = date(2022, 12, 12) # Careful with that, to be changed in the future
+        vol_c = vol_curve(pricing_dt, r, i) 
+        for opt in self._options['Option'] :
+            opt.spot = spot
+            opt.vol = interpolate((opt._t, opt._K), vol_c)
+        
+        self.expandDetails()
+        
+    
     def calc_matrix(self) :
         
-        bins = [0, 0.125, 0.375, 0.5, 0.675, 0.875, 1]
-        labels =[0.10, 0.25, 0.425, 0.575, 0.75, 0.9]
-        self._table['delta_buckets'] = pd.cut(self._table['delta'], bins, labels=labels)
-        self._gammaUpMatrix = self._table.pivot_table(values='gamma_up',
-                                                      index='delta_buckets',
+        bins = np.array([0.5, 0.8625, 0.925, 0.975, 1.025, 1.075, 1.1375, 1.3375]) * self._spot
+        labels =['-OTM', '-13.75%', '-7.5%', 'ATM', '+7.5%', '+13.75%', '+OTM']
+        self._options['moneyness'] = pd.cut(self._options['strike'], bins, labels=labels)
+        self._gammaUpMatrix = self._options.pivot_table(values='gamma_up',
+                                                      index='moneyness',
                                                       columns='tenor',
                                                       aggfunc='sum')
-        self._gammaDownMatrix = self._table.pivot_table(values='gamma_down',
-                                                        index='delta_buckets',
+        self._gammaDownMatrix = self._options.pivot_table(values='gamma_down',
+                                                        index='moneyness',
                                                         columns='tenor',
                                                         aggfunc='sum')
         
     @property
     def table(self) :
-        return self._table
+        if isinstance(self._table, pd.DataFrame) :
+            display_table = self._table.style.format({
+                'tenor' : '{:.2f}',
+                'c_p': '{:.2f}',
+                'strike': '{:.2f}',
+                'delta' : '{:.2f}',
+                'vol' : '{:.2f}',
+                'gamma_up': '{:.2f}',
+                'gamma_down': '{:.2f}',
+                'vega_up': '{:.2f}',
+                'vega_down': '{:.2f}',
+                'theta': '{:.2f}',
+                })
+            return display_table
+        
+        else :
+            return self._table
+    
         
     @property
     def gammaUpMatrix(self) :
-        return self._gammaUpMatrix
+        if isinstance(self._gammaUpMatrix, pd.DataFrame) :
+            display_table = self._gammaUpMatrix.style.format(precision=2)
+            return display_table
+        else :
+            return self._gammaUpMatrix
     
     @property
     def gammaDownMatrix(self) :
-        return self._gammaDownMatrix
+        if isinstance(self._gammaDownMatrix, pd.DataFrame) :
+            display_table = self._gammaDownMatrix.style.format(precision=2)
+            return display_table
+        else :
+            return self._gammaDownMatrix
