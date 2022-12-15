@@ -1,9 +1,15 @@
 body {
   margin: 30px;
-  font-family: Monaco;
+  font-family: Arial, Helvetica, sans-serif;
 }
 table {
   padding: 5px;
+}
+
+th {
+  background-color: lightgray;
+  font: 18px/1.4 Arial, sans-serif;
+  font-weight: bold;
 }
 
 td {
@@ -17,11 +23,6 @@ td {
 
 .data {
   text-align: center;
-}
-
-th {
-  font: 18px/1.4 Arial, sans-serif;
-  font-weight: bold;
 }
 
 @media print {
