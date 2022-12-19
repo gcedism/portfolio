@@ -73,30 +73,31 @@ class BasePortfolio:
         
         """
         self._name = name
+        self._basePricing_dt = initial_pricing_date
 
         self._blotter = self._add_column(blotters['blotter'], 'currency')
         self._cash_blotter = blotters['cash_blotter']
 
         print('\rUpdating portfolio...', flush=True)
-        self.updatePort(initial_pricing_date)
-
-        print('\rUpdating Cash...', flush=True)
-        self.updateCash(initial_pricing_date)
-
-        print('\rCalculating Breakdowns...', flush=True)
-        self._breakdowns()
+        self.basePort()
 
         print('\rCalcuating Sub Portfolios...', flush=True)
-        self._bonds = Bonds(self.port[self.port['asset_class'] == 'bond']).data
-        self._equities = self.port[self.port['asset_class'] == 'equities']
-        _options = self.port[self.port['asset_class'] == 'option']
+        self._bonds = Bonds(self._port[self._port['asset_class'] == 'bond'])
+        self._equities = self._port[self.port['asset_class'] == 'equities']
+        _options = self._port[self.port['asset_class'] == 'option']
         if not _options.empty :
             _options['Option'] = _options.index.map(Securities.options['Option'])
             self._options = Options(_options)
         
         print('\rDone...', flush=True)
-
+        
+    def totalUpdate(self, pricing_dt:date) :
+        self.updatePort(pricing_dt)
+        self.updateCash(pricing_dt)
+        self._breakdowns()
     
+    def basePort(self) :
+        self.totalUpdate(self._basePricing_dt)
 
     def updatePort(self, pricing_dt:date):
         """
@@ -245,12 +246,12 @@ class Bonds:
             self._avg = {}
             self._data = {}
 
-    def cash_projection(self, initial_date: date, end_date: date):
+    def cash_projection(self, start_dt:date, end_dt:date) -> pd.DataFrame:
 
-        ints = self.data.apply(lambda x: x['Bond'].cshf.loc[initial_date:end_date] * x['quantity'], axis=1)
+        ints = self._data.apply(lambda x: x['Bond'].cshf.loc[start_dt:end_dt] * x['quantity'], axis=1)
         ints = pd.concat([x['flow'] for x in ints]).groupby('dates').sum()
-        mats = self.data[(self.data['maturity'] > initial_date)
-                     & (self.data['maturity'] <= end_date)].set_index(
+        mats = self._data[(self._data['maturity'] > start_dt)
+                     & (self._data['maturity'] <= end_dt)].set_index(
                        'maturity').loc[:, 'quantity'] * 100
         mats.index.set_names('dates', inplace=True)
         mats = mats.groupby('dates').sum()
@@ -327,7 +328,7 @@ class Options :
     def updateSpot(self, spot) :
         r = 0.04
         i = 0.02
-        pricing_dt = date(2022, 12, 12) # Careful with that, to be changed in the future
+        pricing_dt = date(2022, 12, 15) # Careful with that, to be changed in the future
         vol_c = vol_curve(pricing_dt, r, i) 
         for opt in self._options['Option'] :
             opt.spot = spot

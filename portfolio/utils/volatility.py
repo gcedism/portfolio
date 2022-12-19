@@ -6,6 +6,9 @@ import numpy as np
 from itertools import product as prod
 from datetime import date
 
+import matplotlib.pyplot as plt
+from matplotlib import cm
+
 # sys.path.append(os.getcwd() + '/..')
 from ..options import SPYOption
 
@@ -34,13 +37,38 @@ def vol_curve(pricing_dt:date, r:float, i:float) -> pd.DataFrame :
     spy_opt = []
     
     for code in last_prices :
-        opt = SPYOption(code, pricing_dt)
-        opt.spot = spot
-        opt.price = last_prices[code]
+        opt = SPYOption(code, pricing_dt, price=last_prices[code], spot=spot)
         spy_opt.append(opt)
     
-    table = pd.DataFrame([{'strike': x._K, 'tenor' : x._t, 'vol' : x.vol} for x in spy_opt])
+    table = pd.DataFrame([{'strike': x._K, 'tenor' : round(x._t, 2), 'vol' : x.vol} for x in spy_opt])
 
     table = table.pivot_table(values='vol', index='tenor', columns='strike', aggfunc='sum')
 
     return table
+
+def printCurve2(*tables) :
+    
+    plt.style.use('_mpl-gallery')
+    fig, ax = plt.subplots(subplot_kw={"projection": "3d"}, figsize=(12,10))
+    
+    for i, table in enumerate(tables) : 
+        # Make data
+        X = table.columns
+        Y = table.index
+        X, Y = np.meshgrid(X, Y)
+        Z = table.values
+
+        # Plot the surface
+        if i == len(tables)-1 :
+            ls = 'solid'
+            color = 'blue'
+        else :
+            ls = 'dotted'
+            color = 'red'
+        ax.plot_wireframe(X, Y, Z, color=color, ls=ls)
+    
+    ax.view_init(elev=40, azim=55)
+    ax.set_xlabel('Strike', fontsize=12, fontweight='bold')
+    ax.set_ylabel('Tenor', fontsize=12, fontweight='bold')
+    ax.set_zlabel('Volatility', fontsize=12, fontweight='bold')
+    plt.show()

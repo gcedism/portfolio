@@ -1,3 +1,6 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
 import scipy.stats
 from numpy import sqrt, log, exp, pi
 from datetime import date
@@ -7,8 +10,6 @@ VEGA_m = 5
 VEGA_e = VEGA_m * 0.01
 IMP_VOL_e = 0.01 # diff in price
 IMP_VOL_max_it = 20
-
-
 
 class Option :
     
@@ -258,20 +259,23 @@ class Option :
     
 class SPYOption(Option) :
     
-    def __init__(self, code:str, pricing_dt:date) :
+    def __init__(self, code:str, pricing_dt:date, price:float=None,
+                 spot:float=392, r:float=0.03, i:float=0.01, vol:float=0.25) :
         # example code : SPY230317C00400000
         self._code = code
         if code[9] == 'C' :
             self._c_p = 'call'
         else : 
             self._c_p = 'put'
-        self._S = 394.48 # I think you can remove that
         self._K = float(code[-6:] ) / 1000
-        self._r = 0.04 # To be obtained
-        self._i = 0.02 # To be calculated
         maturity = date(int('20'+code[3:5]), int(code[5:7]), int(code[7:9]))
         self._t = (maturity - pricing_dt).days/365
-        self._vol = 0.25 # Initial arbitraty value to make calculations work
+        self._vol = vol 
+        self._r = r
+        self._i = i
+        self._S = spot
+        self.price = price
+
         
     @property
     def code(self) :

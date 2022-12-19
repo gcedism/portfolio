@@ -1,3 +1,6 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
 import pandas as pd
 from datetime import datetime as dt
 from datetime import date
@@ -63,9 +66,10 @@ class Securities:
         cls.options['price'] = cls.options.apply(lambda x: hist.loc[pricing_dt, x.name]
                                          if x.name in hist.columns else 1,
                                          axis=1)
-        cls.options['Option'] = cls.options.index.map(lambda x: SPYOption(x, pricing_dt))
-        for i in range(cls.options.shape[0]) :
-            cls.options.iloc[i]['Option'].price = cls.options.iloc[i]['price']
+        cls.options['Option'] = cls.options.apply(lambda x: SPYOption(x.name, pricing_dt, price=x['price']), axis=1)
+        
+        # for i in range(cls.options.shape[0]) :
+        #     cls.options.iloc[i]['Option'].price = cls.options.iloc[i]['price']
     
         
         

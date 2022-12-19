@@ -26,24 +26,34 @@
             <tr>
                 <td>Delta (Options) : </td>
                 <td class="number">{{optionsDelta}}</td>
-                <td>Portfolio Delta</td>
-                <td class="number">{{portDelta}}</td>
-                <td>Total Delta ($)</td>
-                <td class="number">{{totalDelta$}}</td>
-                <td>Total Delta (%)</td>
-                <td class="number">{{totalDelta%}}</td>
-            </tr>
-            <tr>    
                 <td>Total Gamma : </td>
                 <td class="number">{{gamma}}</td>
-            </tr>            
-            <tr>
-                <td>Total Theta : </td>
-                <td class="number">{{theta}}</td>
-            </tr>
-            <tr>
                 <td>Total MtM : </td>
                 <td class="number">{{mtm}}</td>
+                
+            </tr>
+            <tr>    
+                <td>Portfolio Delta</td>
+                <td class="number">{{portDelta}}</td>
+                <td>Total Theta : </td>
+                <td class="number">{{theta}}</td>
+                <td>MtD MtM : </td>
+                <td class="number">{{mtm_mtd}}</td>
+            </tr>            
+            <tr>
+                <td>Total Delta ($)</td>
+                <td class="number">{{totalDelta$}}</td>
+                <td></td><td></td>
+                <td>Cash Movements : </td>
+                <td class="number">{{cashMvmts}}</td>
+            </tr>
+            <tr>
+                <td>Total Delta (%)</td>
+                <td class="number">{{totalDelta%}}</td>
+                <td></td><td></td>
+                <td>PnL : </td>
+                <td class="number">{{pnl}}</td>
+                
             </tr>
         </table>
     </div>
@@ -56,7 +66,7 @@
                 </tr>
                 <tr>
                     <td>{{gammaUpMatrix}}</td>
-                    <td>{{gammaUpMatrix}}</td>
+                    <td>{{gammaDownMatrix}}</td>
                 </tr>
             </tr>
         </table>
