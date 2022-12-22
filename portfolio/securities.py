@@ -4,72 +4,85 @@
 import pandas as pd
 from datetime import datetime as dt
 from datetime import date
-from .._data.p_get_prices import hist # using private import
-# from .._data._get_prices import hist
+
 from .bond import Bond
 from .options import SPYOption
-
-FOLDER = __file__[:-len('portfolio/securities.py')]
 
 class Securities:
     """
     Main Class that gathers basic information about a list of possible securities
     """
-    
-    bonds = pd.read_csv(FOLDER + '_data/bonds.csv', encoding='UTF-8', index_col=0)
-    bonds.loc[:, 'maturity'] = bonds.loc[:, 'maturity'].map(lambda x: dt.strptime(x, '%Y-%m-%d').date())
 
-    equities = pd.read_csv(FOLDER + '_data/equities.csv', encoding='UTF-8', index_col=0)
-
-    funds = pd.read_csv(FOLDER + '_data/funds.csv', encoding='UTF-8', index_col=0)
-    
-    options = pd.read_csv(FOLDER + '_data/options.csv', encoding='UTF-8', index_col=0)
-
-
-    @classmethod
-    def update(cls, pricing_dt:date):
-        """
-        Updates pricing from a previously downloaded data
-        :parameters:
-            pricing_dt: date
-                Reference pricing date
-        """
+    def __init__(self, AC:list[pd.DataFrame], hist:pd.DataFrame, initial_pricing_dt:date, curves) :
+        self._hist = hist
+        self._pricing_dt = initial_pricing_dt
+        self._bonds = AC['bonds']
+        self._equities = AC['equities']
+        self._funds = AC['funds']
+        self._options = AC['options']
+        self._curves = curves
         
-        
-        cls.bonds['price'] = cls.bonds.apply(lambda x: hist.loc[pricing_dt, x.name]
-                                         if x.name in hist.columns else 100,
+        self.update()
+    
+    def update(self) :
+        self._bonds['price'] = self._bonds.apply(lambda x: self._hist.loc[self._pricing_dt, x.name]
+                                         if x.name in self._hist.columns else 100,
                                          axis=1)
-        cls.bonds['Bond'] = cls.bonds.apply(lambda x: Bond(x['maturity'], x['cpn'], x['price'], pricing_dt), axis=1)
-        cls.bonds[['yield', 'spread', 'dur']] = cls.bonds.apply(lambda x: 
+        self._bonds['Bond'] = self._bonds.apply(lambda x: Bond(x['maturity'], x['cpn'], x['price'], self._curves.zero, self._pricing_dt), axis=1)
+        self._bonds[['yield', 'spread', 'dur']] = self._bonds.apply(lambda x: 
                                                                 pd.Series([x['Bond'].y * 100,
                                                                            x['Bond'].spread * 10000,
                                                                            x['Bond'].duration],
                                                                           index=['yield', 'spread', 'duration']), axis=1)
-    
-        
-        cls.equities['price'] = cls.equities.apply(lambda x: hist.loc[pricing_dt, x.name]
-                                                   if x.name in hist.columns else 0, axis=1)
+        self._equities['price'] = self._equities.apply(lambda x: self._hist.loc[self._pricing_dt, x.name]
+                                                   if x.name in self._hist.columns else 0, axis=1)
         
         
-        cls.funds['price'] = cls.funds.apply(lambda x: hist.loc[pricing_dt, x.name]
-                                             if x.name in hist.columns else 0, axis=1)
+        self._funds['price'] = self._funds.apply(lambda x: self._hist.loc[self._pricing_dt, x.name]
+                                             if x.name in self._hist.columns else 0, axis=1)
         
         
-        cls.fx = pd.DataFrame({'id': ['USD', 'EUR', 'CHF', 'CAD', 'BRL', 'GBP']},
+        self._fx = pd.DataFrame({'id': ['USD', 'EUR', 'CHF', 'CAD', 'BRL', 'GBP']},
                               index=['USD', 'EUR=X', 'CHF=X', 'CAD=X', 'BRL=X', 'GBP=X'])
         
         
-        cls.fx['price'] = cls.fx.apply(lambda x: hist.loc[pricing_dt, x.name]
-                                       if x.name in hist.columns else 1, axis=1)
-        cls.fx.set_index('id', inplace=True)
+        self._fx['price'] = self._fx.apply(lambda x: self._hist.loc[self._pricing_dt, x.name]
+                                       if x.name in self._hist.columns else 1, axis=1)
+        self._fx.set_index('id', inplace=True)
         
-        cls.options['price'] = cls.options.apply(lambda x: hist.loc[pricing_dt, x.name]
-                                         if x.name in hist.columns else 1,
+        self._options['price'] = self._options.apply(lambda x: self._hist.loc[self._pricing_dt, x.name]
+                                         if x.name in self._hist.columns else 1,
                                          axis=1)
-        cls.options['Option'] = cls.options.apply(lambda x: SPYOption(x.name, pricing_dt, price=x['price']), axis=1)
+        self._options['Option'] = self._options.apply(lambda x: SPYOption(x.name, self._pricing_dt, price=x['price']), axis=1)
         
-        # for i in range(cls.options.shape[0]) :
-        #     cls.options.iloc[i]['Option'].price = cls.options.iloc[i]['price']
+    @property
+    def bonds(self) :
+        return self._bonds
+    
+    @property
+    def equities(self) :
+        return self._equities
+    
+    @property
+    def funds(self) :
+        return self._funds
+    
+    @property
+    def fx(self) :
+        return self._fx
+    
+    @property
+    def options(self) :
+        return self._options
+    
+    @property
+    def pricing_dt(self) :
+        return self._pricing_dt
+    @pricing_dt.setter
+    def pricing_dt(self, new_dt:date) :
+        self._pricing_dt = new_dt
+        self._curves.pricing_dt = new_dt
+        self.update()        
     
         
         

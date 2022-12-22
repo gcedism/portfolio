@@ -10,7 +10,6 @@ from datetime import datetime as dt
 from datetime import date
 
 from .base import BasePortfolio
-from ..securities import Securities
 
 # from _bonds import cash_projection
 # from _equities import dvd_projection
@@ -19,46 +18,46 @@ class Performance(BasePortfolio) :
     
     def movements(self, start_dt:date, end_dt:date) -> pd.DataFrame:
         
-        blotter = self._blotter[(self._blotter['date'] >= start_dt)
+        blotter = self._blotter[(self._blotter['date'] > start_dt)
                            & (self._blotter['date'] <= end_dt)]
-        blotter = self._add_column(blotter, 'price')
+        blotter = self._add_column(blotter, 'price', self._securities)
         
         #To be fixed with better currency pricing and prices
-        blotter['ccy_price'] = blotter['currency'].map(Securities.fx['price'])
+        blotter['ccy_price'] = blotter['currency'].map(self._securities.fx['price'])
         blotter['mtm'] = blotter['quantity'] * blotter['price'] / blotter['ccy_price']
 
-        blotter['asset_class'] = blotter.index.map(Securities.funds['asset_class'])
+        blotter['asset_class'] = blotter.index.map(self._securities.funds['asset_class'])
         A = blotter.index
-        B = Securities.equities.index
+        B = self._securities.equities.index
         c = np.where(pd.Index(pd.unique(B)).get_indexer(A) >= 0)[0]
         blotter.loc[:, 'asset_class'].iloc[c] = 'equity'
         
         A = blotter.index
-        B = Securities.bonds.index
+        B = self._securities.bonds.index
         c = np.where(pd.Index(pd.unique(B)).get_indexer(A) >= 0)[0]
         blotter.loc[:, 'asset_class'].iloc[c] = 'bond'
         
         A = blotter.index
-        B = Securities.options.index
+        B = self._securities.options.index
         c = np.where(pd.Index(pd.unique(B)).get_indexer(A) >= 0)[0]
         blotter.loc[:, 'asset_class'].iloc[c] = 'option'
 
         return blotter.groupby('asset_class').sum(numeric_only=True)
     
     def cashMovements(self, start_dt:date, end_dt:date) -> pd.DataFrame:
-        cash_blotter = (self._cash_blotter.loc[(self._cash_blotter['date'] >= start_dt)
+        cash_blotter = (self._cash_blotter.loc[(self._cash_blotter['date'] > start_dt)
                                              & (self._cash_blotter['date'] <= end_dt)]
                         .groupby('currency').sum(numeric_only=True))
+        cash_blotter['ccy_price'] = cash_blotter.index.map(self._securities.fx['price'])
+        cash_blotter['mtm'] = cash_blotter['amount'] / cash_blotter['ccy_price']
         
         return cash_blotter
         
         
-    def historicalPerformance(self, dates:list[date]) :
+    def historicalPerformance(self, dates:list[date]) -> pd.Series:
         nav = {}
-        for certain_date in dates : 
-            self.updatePort(certain_date)
-            self.updateCash(certain_date)
-            self._breakdowns()
+        for certain_date in dates :
+            self.pricing_dt = certain_date
             nav[certain_date] = self._assets['amount']
     
         history = pd.DataFrame.from_dict(nav, orient = 'index')
@@ -83,16 +82,14 @@ class Performance(BasePortfolio) :
         plt.yticks(fontsize=12)
         
         self.basePort()
+        
+        return history.loc[:, 'perf']
     
     def performanceAttribution(self, start_dt:date, end_dt:date) :
-        self.updatePort(start_dt)
-        self.updateCash(start_dt)
-        self._breakdowns()
+        self.pricing_dt = start_dt
         values = self._assets
 
-        self.updatePort(end_dt)
-        self.updateCash(end_dt)
-        self._breakdowns()
+        self.pricing_dt = end_dt
         values['endAmt'] = self._assets['amount']
 
         mvmts = self.movements(start_dt, end_dt).groupby('asset_class').sum()['mtm']
@@ -106,6 +103,34 @@ class Performance(BasePortfolio) :
         self.printValues(values, start_dt, end_dt)
         
         self.basePort()
+        
+    def performanceAttribution2(self, start_dt:date, end_dt:date) :
+        self.pricing_dt = end_dt
+        table = self._assets
+
+        self.pricing_dt = start_dt
+        table['start_amt'] = self._assets['amount']
+        
+        try :
+            table['mvmts'] = self.movements(start_dt, end_dt)['mtm']
+        except :
+            table['mvmts'] = [0] * table.shape[0]
+        
+        try :
+            cash_mvmts = self.cashMovements(start_dt, end_dt)['mtm'].sum()
+        except : 
+            cash_mvmts = 0
+        table.loc['cash', 'mvmts'] = - table['mvmts'].sum() + cash_mvmts
+        
+        table.fillna(0, inplace=True)
+        table['pnl'] = table['amount'] - table['mvmts'] - table['start_amt']
+        table['perf'] = table['pnl'] / table['start_amt']
+        table['perfAttr'] = table['perf'] * table['%']
+        table.replace([np.inf, -np.inf], 0, inplace=True)
+        
+        self.basePort()
+        
+        return table
 
     def transformValues(self, values) : 
         values['absPerfAttr'] = abs(values['perfAttr'])

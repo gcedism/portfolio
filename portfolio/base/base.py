@@ -8,13 +8,12 @@ import matplotlib.pyplot as plt
 from datetime import datetime as dt
 from datetime import date
 
-from ..securities import Securities
 from ..utils.volatility import vol_curve
 from ..utils.utils import interpolate
 
 class BasePortfolio:
 
-    def __init__(self, name:str, initial_pricing_date:date, blotters:list[pd.DataFrame]):
+    def __init__(self, name:str, initial_pricing_date:date, blotters:list[pd.DataFrame], securities):
         """
         Basic Portfolio Structure 
         :parameters:
@@ -74,80 +73,80 @@ class BasePortfolio:
         """
         self._name = name
         self._basePricing_dt = initial_pricing_date
+        self._pricing_dt = initial_pricing_date
+        self._securities = securities
 
-        self._blotter = self._add_column(blotters['blotter'], 'currency')
+        self._blotter = self._add_column(blotters['blotter'], 'currency', self._securities)
         self._cash_blotter = blotters['cash_blotter']
 
         print('\rUpdating portfolio...', flush=True)
         self.basePort()
 
         print('\rCalcuating Sub Portfolios...', flush=True)
-        self._bonds = Bonds(self._port[self._port['asset_class'] == 'bond'])
+        self._bonds = Bonds(self._port[self._port['asset_class'] == 'bond'], self._securities)
         self._equities = self._port[self.port['asset_class'] == 'equities']
         _options = self._port[self.port['asset_class'] == 'option']
         if not _options.empty :
-            _options['Option'] = _options.index.map(Securities.options['Option'])
-            self._options = Options(_options)
+            _options['Option'] = _options.index.map(self._securities.options['Option'])
+            self._options = Options(_options, self._securities)
         
         print('\rDone...', flush=True)
         
-    def totalUpdate(self, pricing_dt:date) :
-        self.updatePort(pricing_dt)
-        self.updateCash(pricing_dt)
+    def totalUpdate(self) :
+        self.updatePort()
+        self.updateCash()
         self._breakdowns()
     
     def basePort(self) :
-        self.totalUpdate(self._basePricing_dt)
+        self._pricing_dt = self._basePricing_dt
+        self._securities.pricing_dt = self._basePricing_dt
+        self.totalUpdate()
 
-    def updatePort(self, pricing_dt:date):
+    def updatePort(self):
         """
         Update Portfolio using pricing_dt as a reference for pricing and calculations
         """
-
-        Securities.update(pricing_dt)
-        blotter = self._blotter.loc[self._blotter['date'] <= pricing_dt]
+        blotter = self._blotter.loc[self._blotter['date'] <= self._pricing_dt]
         
         port = blotter.groupby('id').sum(numeric_only=True)
-        port = self._add_column(port, 'price')
-        port = self._add_column(port, 'currency')
+        port = self._add_column(port, 'price', self._securities)
+        port = self._add_column(port, 'currency', self._securities)
         port = port[['quantity', 'cost_price', 'price', 'currency']]
-        port['ccy_price'] = port['currency'].map(Securities.fx['price'])
+        port['ccy_price'] = port['currency'].map(self._securities.fx['price'])
         port['mtm'] = port['quantity'] * port['price'] / port['ccy_price']
         
-        port['asset_class'] = port.index.map(Securities.funds['asset_class'])
+        port['asset_class'] = port.index.map(self._securities.funds['asset_class'])
 
         A = port.index
-        B = Securities.equities.index
+        B = self._securities.equities.index
         c = np.where(pd.Index(pd.unique(B)).get_indexer(A) >= 0)[0]
         port.loc[:, 'asset_class'].iloc[c] = 'equity'
 
         A = port.index
-        B = Securities.bonds.index
+        B = self._securities.bonds.index
         c = np.where(pd.Index(pd.unique(B)).get_indexer(A) >= 0)[0]
         port.loc[:, 'asset_class'].iloc[c] = 'bond'
 
         A = port.index
-        B = Securities.options.index
+        B = self._securities.options.index
         c = np.where(pd.Index(pd.unique(B)).get_indexer(A) >= 0)[0]
         port.loc[:, 'asset_class'].iloc[c] = 'option'
 
         self._port = port
 
-    def updateCash(self, pricing_dt:date):
+    def updateCash(self):
         """
         Update Cash using pricing_dt as a reference for pricing and calculations
         """
-        
-        Securities.update(pricing_dt)
-        cash_blotter = self._cash_blotter.loc[self._cash_blotter['date'] <= pricing_dt]
-        blotter = self._blotter.loc[self._blotter['date'] <= pricing_dt]
+        cash_blotter = self._cash_blotter.loc[self._cash_blotter['date'] <= self._pricing_dt]
+        blotter = self._blotter.loc[self._blotter['date'] <= self._pricing_dt]
 
         blotter['cash_mvmt'] = -blotter['quantity'] * blotter['cost_price'] 
         blotter_cash = blotter.groupby('currency').sum(numeric_only=True)
 
         cash = cash_blotter.groupby('currency').sum(numeric_only=True)
         cash.loc[:, 'amount'] = cash.loc[:, 'amount'].add(blotter_cash.loc[:, 'cash_mvmt'], fill_value=0)
-        cash['ccy_price'] = cash.index.map(Securities.fx['price'])
+        cash['ccy_price'] = cash.index.map(self._securities.fx['price'])
         cash['mtm'] = cash['amount'] / cash['ccy_price']
         
         self._cash = cash
@@ -156,8 +155,6 @@ class BasePortfolio:
         """
         Update Breakdowns using current Portfolio
         """
-        
-        
         if self._port.shape[0] > 0 :
             x = self._port.groupby('currency').sum(numeric_only=True)['mtm'].to_dict()
             y = self._cash['mtm'].to_dict()
@@ -181,13 +178,22 @@ class BasePortfolio:
         assets['%'] = assets['amount'] / assets['amount'].sum()
         self._assets = assets
 
-    @staticmethod
-    def _add_column(table: pd.DataFrame, column: str) -> pd.DataFrame:
+    @property
+    def pricing_dt(self) :
+        return self._pricing_dt
+    @pricing_dt.setter
+    def pricing_dt(self, new_dt:date):
+        self._pricing_dt = new_dt
+        self._securities.pricing_dt = new_dt
+        self.totalUpdate()
         
-        table['eq_aux'] = table.index.map(Securities.equities[column])
-        table['fnds_aux'] = table.index.map(Securities.funds[column])
-        table['bonds_aux'] = table.index.map(Securities.bonds[column])
-        table['options_aux'] = table.index.map(Securities.options[column])
+    @staticmethod
+    def _add_column(table: pd.DataFrame, column: str, securities) -> pd.DataFrame:
+        
+        table['eq_aux'] = table.index.map(securities.equities[column])
+        table['fnds_aux'] = table.index.map(securities.funds[column])
+        table['bonds_aux'] = table.index.map(securities.bonds[column])
+        table['options_aux'] = table.index.map(securities.options[column])
         
 
         m1 = table['eq_aux'].notna()
@@ -199,9 +205,6 @@ class BasePortfolio:
         # table.drop(['eq_aux', 'fnds_aux', 'bonds_aux', 'options_aux'], axis=1, inplace=True)
 
         return table
-
-    
-    
 
 class Bonds:
     """
@@ -216,7 +219,7 @@ class Bonds:
         cash flow projection (adapt from before)
     """
 
-    def __init__(self, bonds: pd.DataFrame):
+    def __init__(self, bonds: pd.DataFrame, securities):
         """
         Calculate the initial data to be displayed
         :parameters:
@@ -230,8 +233,9 @@ class Bonds:
                 mtm : USD market to market value of the position
                 asset_class : string with asset class
         """
+        self._securities = securities
         if bonds.shape[0] > 0 :
-            bonds[['name', 'maturity', 'cpn', 'yield', 'dur', 'spread', 'country', 'sector', 'rating', 'ranking', 'Bond']] = Securities.bonds[['name', 'maturity', 'cpn', 'yield', 'dur', 'spread', 'country', 'sector', 'rating', 'ranking', 'Bond']]
+            bonds[['name', 'maturity', 'cpn', 'yield', 'dur', 'spread', 'country', 'sector', 'rating', 'ranking', 'Bond']] = self._securities.bonds[['name', 'maturity', 'cpn', 'yield', 'dur', 'spread', 'country', 'sector', 'rating', 'ranking', 'Bond']]
             bonds['aux_yield'] = bonds['mtm'] * bonds['yield']
             bonds['aux_dur'] = bonds['mtm'] * bonds['dur']
         
@@ -283,7 +287,7 @@ class Options :
         Net Theta
     """
     
-    def __init__(self, options:pd.DataFrame) :
+    def __init__(self, options:pd.DataFrame, securities) :
         """
         :parameters:
             options : pd.DataFrame, Option,
@@ -292,6 +296,7 @@ class Options :
         
         self._spot = options['Option'][0].spot
         self._options = options
+        self._securities = securities
         self.expandDetails()
         
     def expandDetails(self):
@@ -328,7 +333,7 @@ class Options :
     def updateSpot(self, spot) :
         r = 0.04
         i = 0.02
-        pricing_dt = date(2022, 12, 15) # Careful with that, to be changed in the future
+        pricing_dt = date(2022, 12, 19) # Careful with that, to be changed in the future
         vol_c = vol_curve(pricing_dt, r, i) 
         for opt in self._options['Option'] :
             opt.spot = spot

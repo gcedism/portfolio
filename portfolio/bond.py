@@ -7,11 +7,8 @@ from datetime import date
 
 class Bond():
     
-    us_zero = pd.read_csv('_data/us_zero.csv', index_col=0)
-    us_zero.index = us_zero.index.map(lambda x: dt.strptime(x, '%Y-%m-%d').date())
-
-    def __init__(self, maturity: dt.date, coupon: float, cl_price: float, pricing_dt=dt.now().date(),
-                 freq=6):
+    def __init__(self, maturity:date, coupon:float, cl_price:float, us_zero:pd.DataFrame, pricing_dt:date=dt.now().date(),
+                 freq:int=6):
         """
         Class that calculates factor for a Bond
         :parameters:
@@ -23,6 +20,9 @@ class Bond():
                 
             cl_price : float,
                 Clean Price
+                
+            us_zero : pd.DataFrame,
+                DataFrame with the Us Curve to be used to calculate the Spread
                 
             pricing_dt : date,
                 Pricing Date
@@ -40,7 +40,7 @@ class Bond():
             price
             
         """
-
+        self._us_zero = us_zero
         self._maturity = maturity
         self._coupon = coupon
         self._freq = freq
@@ -56,63 +56,63 @@ class Bond():
         
     def _cash_flow(self):
         _cshf = {
-            'dates': [self.maturity],
+            'dates': [self._maturity],
             'flow': [100 + self.coupon / (12 / self.freq)]
         }
-        new_year = self.maturity.year + ((self.maturity.month - self._freq) < 0) * - 1
-        new_month = (self.maturity.month - self._freq) % 12
+        new_year = self._maturity.year + ((self._maturity.month - self._freq) < 0) * - 1
+        new_month = (self._maturity.month - self._freq) % 12
         if new_month == 0 :
             new_month = 12
         try :
-            _date = date(new_year, new_month, self.maturity.day) # if 31 works
+            _date = date(new_year, new_month, self._maturity.day) # if 31 works
         except :
             try :
-                _date = date(new_year, new_month, self.maturity.day-1) # 30 works
+                _date = date(new_year, new_month, self._maturity.day-1) # 30 works
             except :
                 try :
-                    _date = date(new_year, new_month, self.maturity.day-2) # 29 works
+                    _date = date(new_year, new_month, self._maturity.day-2) # 29 works
                 except :
-                    _date = date(new_year, new_month, self.maturity.day-3) # 28 works
+                    _date = date(new_year, new_month, self._maturity.day-3) # 28 works
 
-        while _date > self.pricing_dt:
+        while _date > self._pricing_dt:
             _cshf['dates'].append(_date)
-            _cshf['flow'].append(self.coupon / (12 / self.freq))
+            _cshf['flow'].append(self._coupon / (12 / self._freq))
             new_year = _date.year + ((_date.month - self._freq) <= 0) * - 1
             new_month = (_date.month - self._freq) % 12
             if new_month == 0 :
                 new_month = 12
             try :
-                _date = date(new_year, new_month, self.maturity.day) # if 31 works
+                _date = date(new_year, new_month, self._maturity.day) # if 31 works
             except :
                 try :
-                    _date = date(new_year, new_month, self.maturity.day-1) # 30 works
+                    _date = date(new_year, new_month, self._maturity.day-1) # 30 works
                 except :
                     try :
-                        _date = date(new_year, new_month, self.maturity.day-2) # 29 works
+                        _date = date(new_year, new_month, self._maturity.day-2) # 29 works
                     except :
-                        _date = date(new_year, new_month, self.maturity.day-3) # 28 works
+                        _date = date(new_year, new_month, self._maturity.day-3) # 28 works
 
-        self.cshf = (pd.DataFrame(_cshf).set_index('dates').sort_index())
-        self.cshf['days'] = (self.cshf.index - self.pricing_dt).days
+        self._cshf = (pd.DataFrame(_cshf).set_index('dates').sort_index())
+        self._cshf['days'] = (self._cshf.index - self._pricing_dt).days
 
     def _calcAcc(self):
-        _date = self.cshf.index[0]
+        _date = self._cshf.index[0]
         new_year = _date.year + ((_date.month - self._freq) < 0) * - 1
         new_month = (_date.month - self._freq) % 12
         if new_month == 0 :
             new_month = 12
         try :
-            last_acc = date(new_year, new_month, self.maturity.day) # if 31 works
+            last_acc = date(new_year, new_month, self._maturity.day) # if 31 works
         except :
             try :
-                last_acc = date(new_year, new_month, self.maturity.day-1) # 30 works
+                last_acc = date(new_year, new_month, self._maturity.day-1) # 30 works
             except :
                 try :
-                    last_acc = date(new_year, new_month, self.maturity.day-2) # 29 works
+                    last_acc = date(new_year, new_month, self._maturity.day-2) # 29 works
                 except :
-                    last_acc = date(new_year, new_month, self.maturity.day-3) # 28 works
+                    last_acc = date(new_year, new_month, self._maturity.day-3) # 28 works
         
-        self._acc = self.coupon / (12 / self._freq) * (self.pricing_dt - last_acc).days / (365 / (12 / self._freq))
+        self._acc = self._coupon / (12 / self._freq) * (self._pricing_dt - last_acc).days / (365 / (12 / self._freq))
 
     def _calc_yield(self):
 
@@ -133,10 +133,10 @@ class Bond():
         i = 0
         y = self._coupon / 100
         while (abs(fx) >= e) and (i <= max_it):
-            fx = self.cshf.apply(lambda x: x['flow'] /
+            fx = self._cshf.apply(lambda x: x['flow'] /
                            ((1 + y / 2)**(x['days'] / (365/(12/self._freq)))),
                            axis=1).sum() - self._pv
-            dfx = self.cshf.apply(lambda x: -x['flow'] * x['days'] / (2 * (365/(12/self._freq))) *
+            dfx = self._cshf.apply(lambda x: -x['flow'] * x['days'] / (2 * (365/(12/self._freq))) *
                             ((y / 2 + 1)**(-x['days'] / (365/(12/self._freq)) - 1)),
                             axis=1).sum()
             y = y - fx / dfx
@@ -156,12 +156,12 @@ class Bond():
         # x1 = xo - fx / f'x
         ## ***********************************************************
 
-        _cshf = self.cshf.join(Bond.us_zero['df'],
-      how='outer').sort_index().interpolate().loc[self.cshf.index]
+        _cshf = self._cshf.join(self._us_zero['df'], how='outer').sort_index()
+        _cshf.index = pd.DatetimeIndex(_cshf.index)
+        _cshf = _cshf.astype(float).interpolate(method='time', limit_direction='both').loc[self._cshf.index]
         _cshf['zero_y'] = _cshf.apply(lambda x:
                                   (1 / x['df'] - 1) * 360 / x['days'],
                                   axis=1)
-
         spread = 0.01
         e = 0.001
         max_it = 10
@@ -180,22 +180,26 @@ class Bond():
             spread = spread - fx / dfx
             i += 1
 
-        self.spread = spread
+        self._spread = spread
 
     def _calc_duration(self):
 
-        pv = self.cshf.apply(lambda x: x['flow'] /
+        pv = self._cshf.apply(lambda x: x['flow'] /
                          ((1 + self._y / 2)**(x['days'] / (365/(12/self._freq)))),
                          axis=1)
-        md = self.cshf.loc[:, 'days'] * pv
+        md = self._cshf.loc[:, 'days'] * pv
 
-        self.duration = md.sum() / self._pv / 365
+        self._duration = md.sum() / self._pv / 365
     
     def _calc_dv01(self) :
         
-        pv_01 = self.cshf.apply(lambda x : x['flow'] / ((1 + (self._y+0.0001) / 2 ) ** (x['days'] / (365/(12/self._freq)))), axis=1).sum()
-        pv_001 = self.cshf.apply(lambda x : x['flow'] / ((1 + (self._y-0.0001) / 2 ) ** (x['days'] / (365/(12/self._freq)))), axis=1).sum()
+        pv_01 = self._cshf.apply(lambda x : x['flow'] / ((1 + (self._y+0.0001) / 2 ) ** (x['days'] / (365/(12/self._freq)))), axis=1).sum()
+        pv_001 = self._cshf.apply(lambda x : x['flow'] / ((1 + (self._y-0.0001) / 2 ) ** (x['days'] / (365/(12/self._freq)))), axis=1).sum()
         self._dv01 = (pv_001 - pv_01)/2 * 1_000
+    
+    @property
+    def cshf(self) :
+        return self._cshf
     
     @property
     def maturity(self):
@@ -238,6 +242,10 @@ class Bond():
         self._calc_dv01()
         
     @property
+    def spread(self) :
+        return self._spread
+    
+    @property
     def pricing_dt(self):
         return self._pricing_dt
     @pricing_dt.setter
@@ -254,6 +262,17 @@ class Bond():
     def dv01(self):
         return self._dv01
     
+    @property
+    def duration(self):
+        return self._duration
+    
+    @property
+    def us_zero(self) :
+        return self._us_zero
+    @us_zero.setter
+    def us_zero(self, new_zero) :
+        self._us_zero = new_zero
+        self._calc_spread()
     
     'Method used for us_zero curve bootsrapp (maybe it should not be here)'
     @staticmethod

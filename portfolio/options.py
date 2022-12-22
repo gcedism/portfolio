@@ -260,7 +260,7 @@ class Option :
 class SPYOption(Option) :
     
     def __init__(self, code:str, pricing_dt:date, price:float=None,
-                 spot:float=392, r:float=0.03, i:float=0.01, vol:float=0.25) :
+                 spot:float=380, r:float=0.03, i:float=0.01, vol:float=0.25) :
         # example code : SPY230317C00400000
         self._code = code
         if code[9] == 'C' :

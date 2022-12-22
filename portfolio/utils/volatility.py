@@ -46,7 +46,7 @@ def vol_curve(pricing_dt:date, r:float, i:float) -> pd.DataFrame :
 
     return table
 
-def printCurve2(*tables) :
+def printCurve(*tables) :
     
     plt.style.use('_mpl-gallery')
     fig, ax = plt.subplots(subplot_kw={"projection": "3d"}, figsize=(12,10))
