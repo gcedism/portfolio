@@ -13,7 +13,8 @@ IMP_VOL_max_it = 20
 
 class Option :
     
-    def __init__(self, c_p:str, S:float, K:float, r:float, i:float, t:float, vol:float) :
+    def __init__(self, c_p:str, S:float, K:float, r:float, i:float, t:float,
+                 vol:float, vol_surface=None) :
         """
         Base class for all options
         :parameters:
@@ -31,6 +32,9 @@ class Option :
                 Tenor
             vol : float,
                 Volatility annualised
+                
+            vol_surface : Vol_surface (Optional),
+                Volatility Surface object
         """
         
         self._c_p = c_p
@@ -40,6 +44,7 @@ class Option :
         self._i = i
         self._t = t
         self._vol = vol
+        self._vol_surface = vol_surface
         self.calc_price()
         self.calc_delta()
         self.calc_gamma_up()
@@ -114,14 +119,11 @@ class Option :
     @spot.setter
     def spot(self, _spot):
         self._S = _spot
-        # Not yet implemented, because when spot changes, the vol needs to be interpolated
-        # self.calc_price()
-        # self.calc_delta()
-        # self.calc_gamma_up()
-        # self.calc_gamma_down()
-        # self.calc_vega_up()
-        # self.calc_vega_down()
-        # self.calc_mod_theta()
+        try :
+            #Determining the Vol already updated Price and Greeks. 
+            self.vol = self._vol_surface.interpolate(self._t, self._K / _spot - 1)
+        except :
+            print('Vol Surface not defined')
     
     def calc_delta(self) :
         N = scipy.stats.norm.cdf
@@ -232,7 +234,7 @@ class Option :
         y = self._vol
         target_price = self._price
         
-        while (abs(fx) >= IMP_VOL_e) and (i <= IMP_VOL_max_it):
+        while (abs(fx) >= IMP_VOL_e) & (i <= IMP_VOL_max_it):
             self.calc_price()
             fx = self._price - target_price
             self.calc_vega_up()
@@ -260,7 +262,7 @@ class Option :
 class SPYOption(Option) :
     
     def __init__(self, code:str, pricing_dt:date, price:float=None,
-                 spot:float=380, r:float=0.03, i:float=0.01, vol:float=0.25) :
+                 spot:float=380, r:float=0.03, i:float=0.01, vol:float=0.25, vol_surface=None) :
         # example code : SPY230317C00400000
         self._code = code
         if code[9] == 'C' :
@@ -270,10 +272,14 @@ class SPYOption(Option) :
         self._K = float(code[-6:] ) / 1000
         maturity = date(int('20'+code[3:5]), int(code[5:7]), int(code[7:9]))
         self._t = (maturity - pricing_dt).days/365
+        
+        #It doesn't matter in the creating because we will calculate the imp_vol based on the price given
         self._vol = vol 
+        
         self._r = r
         self._i = i
         self._S = spot
+        self._vol_surface = vol_surface
         self.price = price
 
         

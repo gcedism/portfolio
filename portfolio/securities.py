@@ -13,7 +13,7 @@ class Securities:
     Main Class that gathers basic information about a list of possible securities
     """
 
-    def __init__(self, AC:list[pd.DataFrame], hist:pd.DataFrame, initial_pricing_dt:date, curves) :
+    def __init__(self, AC:list[pd.DataFrame], hist:pd.DataFrame, initial_pricing_dt:date, curves, volatilities) :
         self._hist = hist
         self._pricing_dt = initial_pricing_dt
         self._bonds = AC['bonds']
@@ -21,6 +21,7 @@ class Securities:
         self._funds = AC['funds']
         self._options = AC['options']
         self._curves = curves
+        self._volatilities = volatilities
         
         self.update()
     
@@ -50,10 +51,17 @@ class Securities:
                                        if x.name in self._hist.columns else 1, axis=1)
         self._fx.set_index('id', inplace=True)
         
+        
+        self._volatilities.pricing_dt = self._pricing_dt
         self._options['price'] = self._options.apply(lambda x: self._hist.loc[self._pricing_dt, x.name]
                                          if x.name in self._hist.columns else 1,
                                          axis=1)
-        self._options['Option'] = self._options.apply(lambda x: SPYOption(x.name, self._pricing_dt, price=x['price']), axis=1)
+        self._options['Option'] = self._options.apply(lambda x: 
+                                                      SPYOption(x.name,
+                                                                self._pricing_dt,
+                                                                price=x['price'],
+                                                                vol_surface=self._volatilities),
+                                                      axis=1)
         
     @property
     def bonds(self) :
@@ -82,6 +90,7 @@ class Securities:
     def pricing_dt(self, new_dt:date) :
         self._pricing_dt = new_dt
         self._curves.pricing_dt = new_dt
+        self._volatilities.pricing_dt = new_dt
         self.update()        
     
         

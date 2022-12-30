@@ -25,6 +25,6 @@ def display_side_by_side_title(*args, titles=cycle([''])):
 def interpolate(coord:tuple, table:pd.DataFrame) -> float :
     _table = table.copy()
     _table.loc[coord[0], coord[1]] = np.NaN
-    _table = _table[sorted(_table.columns)].sort_index().interpolate(axis=0).interpolate(axis=1)
+    _table = _table[sorted(_table.columns)].sort_index().interpolate('slinear', fill_value='extrapolate', limit_direction='both',axis=0).interpolate(axis=1)
     
     return _table.loc[coord[0], coord[1]]

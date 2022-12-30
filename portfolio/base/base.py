@@ -8,7 +8,6 @@ import matplotlib.pyplot as plt
 from datetime import datetime as dt
 from datetime import date
 
-from ..utils.volatility import vol_curve
 from ..utils.utils import interpolate
 
 class BasePortfolio:
@@ -334,7 +333,7 @@ class Options :
         r = 0.04
         i = 0.02
         pricing_dt = date(2022, 12, 19) # Careful with that, to be changed in the future
-        vol_c = vol_curve(pricing_dt, r, i) 
+        # vol_c = vol_curve(pricing_dt, r, i) 
         for opt in self._options['Option'] :
             opt.spot = spot
             opt.vol = interpolate((opt._t, opt._K), vol_c)
