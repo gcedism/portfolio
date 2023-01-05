@@ -10,9 +10,12 @@ from datetime import datetime as dt
 from datetime import timedelta as td
 from datetime import date
 
+FOLDER = __file__[:-len('curves.py')]
+
 class Curves :
     
-    def __init__(self, country:str, initial_pricing_dt:date) :
+    def __init__(self, country:str, initial_pricing_dt:date,
+                 hist_start_dt:date, download:bool=True) :
         """
         Generates Curves
         :Parameters:
@@ -24,85 +27,102 @@ class Curves :
         
         self._country = country
         self._pricing_dt = initial_pricing_dt
+        self._hist_start_dt = hist_start_dt
         self._depositsHistory = {}
         self._govtHistory = {}
         
-        self.downloadDeposits()
+        self.downloadDeposits(download)
         self.updateDeposits()
         
-        self.downloadGovt()
+        self.downloadGovt(download)
         self.updateGovt()
         
         self.updateZero()
         
-    def downloadDeposits(self) :
+    def downloadDeposits(self, download:bool=True) :
         
         if self._country == 'us' :
             if 'us' not in self._depositsHistory.keys() :
-                params = {
-                    'startDt' : '2020-12-01',
-                    'endDt' : dt.strftime(self._pricing_dt, '%Y-%m-%d'),
-                    'eventCodes' : '525',
-                    'productCode' : '50',
-                    'sort' : 'postDt:-1,eventCode:1',
-                    'format' : 'xlsx'
-                }
-                p_excel = {
-                    'index_col': 0,
-                    'engine': 'openpyxl',
-                    'usecols' : [0, 13, 14, 15, 16] 
-                }
-                url = 'https://markets.newyorkfed.org/read?'
+                if download :
+                    params = {
+                        'startDt' : dt.strftime(self._hist_start_dt, '%Y-%m-%d'),
+                        'endDt' : dt.strftime(self._pricing_dt, '%Y-%m-%d'),
+                        'eventCodes' : '525',
+                        'productCode' : '50',
+                        'sort' : 'postDt:-1,eventCode:1',
+                        'format' : 'xlsx'
+                    }
+                    p_excel = {
+                        'index_col': 0,
+                        'engine': 'openpyxl',
+                        'usecols' : [0, 13, 14, 15, 16] 
+                    }
+                    url = 'https://markets.newyorkfed.org/read?'
         
-                r = requests.get(url, params=params)
-                with warnings.catch_warnings(record=True):
-                    warnings.simplefilter("always")
-                    df = pd.read_excel(r.content, **p_excel)
+                    r = requests.get(url, params=params)
+                    with warnings.catch_warnings(record=True):
+                        warnings.simplefilter("always")
+                        df = pd.read_excel(r.content, **p_excel)
             
-                df.index = df.index.map(lambda x : dt.strptime(x, '%m/%d/%Y').date())
-                df.columns = [30, 90, 180, 'index']
+                    df.index = df.index.map(lambda x : dt.strptime(x, '%m/%d/%Y').date())
+                    df.columns = ['30', '90', '180', 'index']
                 
                 #Adjustment for FallBack spreads
-                fb_spreads = {
-                    30 : 0.11448,
-                    90 : 0.26161,
-                    180 :0.42826
-                }
-                for col in fb_spreads :
-                    df.loc[:, col] += fb_spreads[col]
+                    fb_spreads = {
+                        '30' : 0.11448,
+                        '90' : 0.26161,
+                        '180' :0.42826
+                    }
+                    for col in fb_spreads :
+                        df.loc[:, col] += fb_spreads[col]
                     
-                self._depositsHistory['us'] = df.sort_index()
+                    self._depositsHistory['us'] = df.sort_index()
+                    self._depositsHistory['us'].to_csv(FOLDER + '_data/us_deposits_history.csv')
+                else :
+                    self._depositsHistory['us'] = pd.read_csv(FOLDER + '_data/us_deposits_history.csv', index_col=0)
+                    self._depositsHistory['us'].index = self._depositsHistory['us'].index.map(lambda x : dt.strptime(x, '%Y-%m-%d').date())
     
     def updateDeposits(self) :
         idx = self._depositsHistory[self._country].index.get_indexer([self._pricing_dt], method='nearest')
-        self._deposits = self._depositsHistory[self._country].iloc[idx].loc[:, [30, 90, 180]].T
-     
-    def downloadGovt(self) :
+        self._deposits = self._depositsHistory[self._country].iloc[idx].loc[:, ['30', '90', '180']].T
+        self._deposits.index = self._deposits.index.map(int)
+                     
+    def downloadGovt(self, download:bool=True) :
         
         if self._country == 'us' :
             if 'us' not in self._govtHistory.keys() :
-                params = {
-                    'type' : 'daily_treasury_yield_curve',
-                    'field_tdr_date_value' : '2022',
-                    '_format' : 'csv'
-                }
-                p_csv = {
-                    'index_col': 0,
-                }
-                url = ' https://home.treasury.gov/resource-center/data-chart-center/interest-rates/daily-treasury-rates.csv/' + str(self._pricing_dt.year) + '/all?'
+                if download :
+                    dfs = []
+                    for year in range(self._hist_start_dt.year, self._pricing_dt.year+1) :
+                    
+                        params = {
+                            'type' : 'daily_treasury_yield_curve',
+                            'field_tdr_date_value' : str(year),
+                            '_format' : 'csv'
+                        }
+                        p_csv = {
+                            'index_col': 0,
+                        }
+                        url = 'https://home.treasury.gov/resource-center/data-chart-center/interest-rates/daily-treasury-rates.csv/' + str(year) + '/all?'
         
-                r = requests.get(url, params=params).content
-                df = pd.read_csv(io.StringIO(r.decode('utf-8')), **p_csv)
-            
-                df.index = df.index.map(lambda x : dt.strptime(x, '%m/%d/%Y').date())
-                df.columns = [30, 60, 90, 120, 180,
-                              365, 730, 1095, 1825, 
-                              2555, 3650, 7300, 10950]
-                self._govtHistory['us'] = df.sort_index()
+                        r = requests.get(url, params=params).content
+                        dfs.append(pd.read_csv(io.StringIO(r.decode('utf-8')), **p_csv))
+                
+                    df = pd.concat(dfs)
+                    df.index = df.index.map(lambda x : dt.strptime(x, '%m/%d/%Y').date())
+                    df.columns = [30, 60, 90, 120, 180,
+                                  365, 730, 1095, 1825, 
+                                  2555, 3650, 7300, 10950]
+                    self._govtHistory['us'] = df.sort_index()
+                    self._govtHistory['us'].to_csv(FOLDER + '_data/us_govt_history.csv')
+                else :
+                    self._govtHistory['us'] = pd.read_csv(FOLDER + '_data/us_govt_history.csv', index_col=0)
+                    self._govtHistory['us'].index = self._govtHistory['us'].index.map(lambda x : dt.strptime(x, '%Y-%m-%d').date())
                 
     def updateGovt(self) :
         idx = self._govtHistory[self._country].index.get_indexer([self._pricing_dt], method='nearest')
         self._govt = self._govtHistory[self._country].iloc[idx].T
+        self._govt.index = self._govt.index.map(int)
          
     def updateZero(self) :
         
@@ -156,6 +176,20 @@ class Curves :
         _zero['dates'] = _zero.index.map(lambda x : self._pricing_dt + td(days=int(x)))
         _zero.set_index('dates', inplace=True)
         self._zero = _zero
+    
+    def interpolate(self, _date:date) -> float:
+        _table = self._zero[['df']].copy()
+        _table.loc[_date, 'df'] = np.NaN
+        _table.index = pd.DatetimeIndex(_table.index)
+        _table = (_table.sort_index()
+                  .astype(float)
+                  .interpolate('time',
+                               fill_value='extrapolate',
+                               limit_direction='both',
+                               axis=0))
+        _table.index = _table.index.map(lambda x : x.date())
+        
+        return _table.loc[_date, 'df']
     
     @property
     def deposits(self) :

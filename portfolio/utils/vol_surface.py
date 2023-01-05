@@ -2,11 +2,14 @@ import yfinance as yf
 import pandas as pd
 import numpy as np
 from itertools import product as prod
+from datetime import datetime as dt
 from datetime import date
 
 import matplotlib.pyplot as plt
 
 from ..options import SPYOption
+
+FOLDER = __file__[:-len('vol_surface.py')]
 
 class Vol_surface :
         
@@ -100,34 +103,44 @@ class Vol_surface :
         
 class SPYVolSurface(Vol_surface) :
     
-    def __init__(self, initial_pricing_dt:date, r:float, i:float) :
+    def __init__(self, initial_pricing_dt:date, r:float, i:float, download:bool=True) :
         self._pricing_dt = initial_pricing_dt
         self._r = r
         self._i = i
-        self.downloadHistory()
+        self.downloadHistory(download)
         self.createSurface()
         
-    def downloadHistory(self) :
+    def downloadHistory(self, download:bool=True) :
         
-        spots = yf.Ticker('SPY').history()['Close']
-        spots.index = spots.index.map(lambda x : x.date())
+        if download : 
+            spots = pd.DataFrame(yf.Ticker('SPY').history()['Close'])
+            spots.index = spots.index.map(lambda x : x.date())
     
-        maturities = ['230120', '230317', '230616', '231215']
-        c_strikes = np.array([1, 1.075, 1.1375, 1.25]) * spots[-1]
-        c_strikes = (c_strikes / 5).round().astype(int) * 5
-        p_strikes = np.array([0.75, 0.8625, 0.925]) * spots[-1]
-        p_strikes = (p_strikes / 5).round().astype(int) * 5
+            maturities = ['230217', '230317', '230616', '231215']
+            c_strikes = np.array([1, 1.075, 1.1375, 1.25]) * spots.iloc[-1][0]
+            c_strikes = (c_strikes / 5).round().astype(int) * 5
+            p_strikes = np.array([0.75, 0.8625, 0.925]) * spots.iloc[-1][0]
+            p_strikes = (p_strikes / 5).round().astype(int) * 5
 
-        codes = [
-            'SPY' + m + 'C' + '00' + str(s) + '000' 
-            for m, s in prod(maturities, c_strikes)
-            ]+[
-            'SPY' + m + 'P' + '00' + str(s) + '000' 
-            for m, s in prod(maturities, p_strikes)
-        ]
+            codes = [
+                'SPY' + m + 'C' + '00' + str(s) + '000' 
+                for m, s in prod(maturities, c_strikes)
+                ]+[
+                'SPY' + m + 'P' + '00' + str(s) + '000' 
+                for m, s in prod(maturities, p_strikes)
+            ]
     
-        opt_prices = yf.download(codes, period='3mo')['Adj Close']
-        opt_prices.index = opt_prices.index.map(lambda x : x.date())
+            opt_prices = yf.download(codes, period='3mo')['Adj Close']
+            opt_prices.index = opt_prices.index.map(lambda x : x.date())
+            
+            spots.to_csv(FOLDER + '_data/opt_spots_history.csv')
+            opt_prices.to_csv(FOLDER + '_data/opt_prices_history.csv')
+        else : 
+            spots = pd.read_csv(FOLDER + '_data/opt_spots_history.csv', index_col=0)
+            spots.index = spots.index.map(lambda x: dt.strptime(x, '%Y-%m-%d').date())
+            
+            opt_prices = pd.read_csv(FOLDER + '_data/opt_prices_history.csv', index_col=0)
+            opt_prices.index = opt_prices.index.map(lambda x: dt.strptime(x, '%Y-%m-%d').date())
         
         self._spots = spots
         self._opt_prices = opt_prices
@@ -136,7 +149,7 @@ class SPYVolSurface(Vol_surface) :
         
         idx = self._opt_prices.index.get_indexer([self._pricing_dt], method='nearest')
         opt_prices = self._opt_prices.iloc[idx].T.iloc[:, 0]
-        idx = self._spots.index.get_indexer([self._pricing_dt], method='nearest')
+        idx = self._spots.index.get_indexer([self._pricing_dt], method='nearest')[0]
         spot = self._spots.iloc[idx][0]
         spy_opt = []
             

@@ -7,7 +7,8 @@ from datetime import date
 
 class Bond():
     
-    def __init__(self, maturity:date, coupon:float, cl_price:float, us_zero:pd.DataFrame, pricing_dt:date=dt.now().date(),
+    def __init__(self, maturity:date, coupon:float, cl_price:float,
+                 us_zero:pd.DataFrame, pricing_dt:date=dt.now().date(),
                  freq:int=6):
         """
         Class that calculates factor for a Bond
@@ -197,6 +198,42 @@ class Bond():
         pv_001 = self._cshf.apply(lambda x : x['flow'] / ((1 + (self._y-0.0001) / 2 ) ** (x['days'] / (365/(12/self._freq)))), axis=1).sum()
         self._dv01 = (pv_001 - pv_01)/2 * 1_000
     
+    def multiUpdate(self, new_pricing_dt:date, new_price:float, new_us_zero:pd.DataFrame) :
+        self._cl_price = new_price
+        self._pricing_dt = new_pricing_dt
+        self._us_zero = new_us_zero
+        
+        self._cash_flow()
+        self._calcAcc()
+        self._pv = new_price + self._acc
+        self._calc_yield()
+        self._calc_spread()
+        self._calc_duration()
+        self._calc_dv01()
+    
+    def desc(self) :
+        maturity = date.strftime(self._maturity, '%d-%b-%y')
+        coupon = '{:.2f}'.format(self._coupon)
+        pricing_dt = date.strftime(self._pricing_dt, '%d-%b-%y')
+        cl_price = '{:.2f}'.format(self._cl_price)
+        acc = '{:.2f}'.format(self._acc)
+        y = '{:.2%}'.format(self._y)
+        spread = '{:.2%}'.format(self._spread)
+        duration = '{:.1f}'.format(self._duration)
+        dv01 = '{:.2%}'.format(self._dv01)
+        
+        print('Bond description')
+        print('Asset : <asset>')
+        print(f'Maturity : {maturity}')
+        print(f'Coupon : {coupon}')
+        print(f'Pricing Date : {pricing_dt}')
+        print(f'Clean Price : {cl_price}')
+        print(f'Accrued Interest : {acc}')
+        print(f'Yield To Maturity : {y}')
+        print(f'Z-Spread : {spread}')
+        print(f'Duration : {duration}')
+        print(f'dv01 : {dv01}')
+    
     @property
     def cshf(self) :
         return self._cshf
@@ -229,6 +266,10 @@ class Bond():
             self._calc_dv01()
     
     @property
+    def price(self):
+        return self._pv
+    
+    @property
     def y(self) :
         return self._y
     @y.setter
@@ -253,7 +294,7 @@ class Bond():
         self._pricing_dt = date
         self._cash_flow()
         self._calcAcc()
-        self._pv = self.cl_price + self._acc
+        self._pv = self._cl_price + self._acc
         self._calc_yield()
         self._calc_spread()
         self._calc_duration()

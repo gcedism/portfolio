@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
+import pandas as pd
 import numpy as np
 from IPython.display import display_html
 from datetime import datetime as dt
@@ -86,6 +87,8 @@ class Reports(BasePortfolio) :
         
         _base_pricing_dt = self._pricing_dt
          
+        total_mtm = '{:,.0f}'.format(self._assets['amount'].sum())    
+        
         #YESTERDAY FIGURES
         d1_date = (_base_pricing_dt - CDay(1)).date()
         table = self.performanceAttribution2(d1_date, _base_pricing_dt)
@@ -115,7 +118,10 @@ class Reports(BasePortfolio) :
             f.close()
         
         tpl = tpl.replace('{{date}}', _date)
-                
+        
+        tpl = tpl.replace('{{pricing_dt}}', dt.strftime(_base_pricing_dt, '%d-%b-%y'))
+        tpl = tpl.replace('{{total_mtm}}', total_mtm)
+        
         tpl = tpl.replace('{{d1_pnl}}', "{:,.0f}".format(d1_pnl))
         tpl = tpl.replace('{{d1_pnl%}}', "{:,.2%}".format(d1_pnl_p))
         tpl = tpl.replace('{{mtd_pnl}}', "{:,.0f}".format(mtd_pnl))
@@ -160,7 +166,32 @@ class Reports(BasePortfolio) :
         self._securities._curves.pricing_dt = _base_dt
         
         print(rates)
-    
+        
+    def all_assets(self) :
+        
+        _assets = self._port.pivot_table(values='mtm',
+                                        index='asset_class', columns='currency',
+                                        aggfunc='sum')
+        _cash = self._cash[['mtm']].rename(columns={'mtm' : 'cash'}).T
+        _table = pd.concat([_assets, _cash])
+        
+        #Add Sum and Order based on Sum
+        _table.loc['sum'] = _table.sum(axis=0)
+        _table = _table.iloc[:, (-_table.iloc[-1, :]).argsort()]
+        #Remove Sum
+        _table = _table.iloc[:-1]
+        
+        #Add Column Total and %
+        _table['total'] = _table.sum(axis=1)
+        _table['%'] = _table['total'] / _table['total'].sum()
+        _table = _table.sort_values(by='total', ascending=False)
+        
+        #Re-add Row Total and %
+        _table.loc['sum'] = _table.sum(axis=0)
+        _table.loc['%'] = _table.loc['sum'] / _table.loc['sum'].sum() * 2
+        
+        #Return a style (to be improved)
+        return _table.fillna('-').style.format(precision=2)
 
 
 

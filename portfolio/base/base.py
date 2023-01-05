@@ -84,7 +84,7 @@ class BasePortfolio:
         print('\rCalcuating Sub Portfolios...', flush=True)
         self._bonds = Bonds(self._port[self._port['asset_class'] == 'bond'], self._securities)
         self._equities = self._port[self.port['asset_class'] == 'equities']
-        _options = self._port[self.port['asset_class'] == 'option']
+        _options = self._port[self.port['asset_class'] == 'options']
         if not _options.empty :
             _options['Option'] = _options.index.map(self._securities.options['Option'])
             self._options = Options(_options, self._securities)
@@ -100,39 +100,25 @@ class BasePortfolio:
         self._pricing_dt = self._basePricing_dt
         self._securities.pricing_dt = self._basePricing_dt
         self.totalUpdate()
-
-    def updatePort(self):
+    
+    def updatePort(self) :
         """
         Update Portfolio using pricing_dt as a reference for pricing and calculations
         """
         blotter = self._blotter.loc[self._blotter['date'] <= self._pricing_dt]
-        
+        blotter['auxPrice'] = blotter['cost_price'] * blotter['quantity']
         port = blotter.groupby('id').sum(numeric_only=True)
-        port = self._add_column(port, 'price', self._securities)
-        port = self._add_column(port, 'currency', self._securities)
-        port = port[['quantity', 'cost_price', 'price', 'currency']]
+        port['cost_price'] = port['auxPrice'] / port['quantity']
+        
+        port['asset_class'] = port.index.map(self._securities.id_all['asset_class'])
+        port['price'] = port.index.map(self._securities.id_all['price'])
+        port['currency'] = port.index.map(self._securities.id_all['currency'])
         port['ccy_price'] = port['currency'].map(self._securities.fx['price'])
+        
         port['mtm'] = port['quantity'] * port['price'] / port['ccy_price']
         
-        port['asset_class'] = port.index.map(self._securities.funds['asset_class'])
-
-        A = port.index
-        B = self._securities.equities.index
-        c = np.where(pd.Index(pd.unique(B)).get_indexer(A) >= 0)[0]
-        port.loc[:, 'asset_class'].iloc[c] = 'equity'
-
-        A = port.index
-        B = self._securities.bonds.index
-        c = np.where(pd.Index(pd.unique(B)).get_indexer(A) >= 0)[0]
-        port.loc[:, 'asset_class'].iloc[c] = 'bond'
-
-        A = port.index
-        B = self._securities.options.index
-        c = np.where(pd.Index(pd.unique(B)).get_indexer(A) >= 0)[0]
-        port.loc[:, 'asset_class'].iloc[c] = 'option'
-
-        self._port = port
-
+        self._port = port[['quantity', 'cost_price', 'price', 'currency',  'ccy_price', 'mtm', 'asset_class']]
+                
     def updateCash(self):
         """
         Update Cash using pricing_dt as a reference for pricing and calculations

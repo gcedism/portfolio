@@ -99,6 +99,21 @@ class Option :
         
         self._price = price
     
+    def interpolateVol(self) :
+        _table = self.vol_surface.copy()
+        _table.loc[self._t, self._K/self._S-1] = np.NaN
+        _table = (_table[sorted(_table.columns)]
+                  .sort_index()
+                  .interpolate('slinear',
+                               fill_value='extrapolate',
+                               limit_direction='both',
+                               axis=0)
+                  .interpolate('slinear',
+                               fill_value='extrapolate',
+                               limit_direction='both',
+                               axis=1))
+        self._vol = _table.loc[_t, _money]
+    
     @property
     def price(self) :
         return self._price
@@ -121,9 +136,30 @@ class Option :
         self._S = _spot
         try :
             #Determining the Vol already updated Price and Greeks. 
-            self.vol = self._vol_surface.interpolate(self._t, self._K / _spot - 1)
+            # self.vol = self._vol_surface.interpolate(self._t, self._K / _spot - 1)
+            self.interpolateVol()
+            self.calc_price()
+            self.calc_delta()
+            self.calc_gamma_up()
+            self.calc_gamma_down()
+            self.calc_vega_up()
+            self.calc_vega_down()
+            self.calc_mod_theta()
         except :
             print('Vol Surface not defined')
+    
+    def multiUpdate(self, new_price:float, new_spot:float, new_pricing_dt:date) :
+        self._price = new_price
+        self._t = (self._maturity - new_pricing_dt).days/365
+        self._S = new_spot
+        
+        self.calc_imp_vol()
+        self.calc_delta()
+        self.calc_gamma_up()
+        self.calc_gamma_down()
+        self.calc_vega_up()
+        self.calc_vega_down()
+        self.calc_mod_theta()
     
     def calc_delta(self) :
         N = scipy.stats.norm.cdf
@@ -257,7 +293,6 @@ class Option :
         self.calc_vega_up()
         self.calc_vega_down()
         self.calc_mod_theta()
-        
     
 class SPYOption(Option) :
     
@@ -270,8 +305,8 @@ class SPYOption(Option) :
         else : 
             self._c_p = 'put'
         self._K = float(code[-6:] ) / 1000
-        maturity = date(int('20'+code[3:5]), int(code[5:7]), int(code[7:9]))
-        self._t = (maturity - pricing_dt).days/365
+        self._maturity = date(int('20'+code[3:5]), int(code[5:7]), int(code[7:9]))
+        self._t = (self._maturity - pricing_dt).days/365
         
         #It doesn't matter in the creating because we will calculate the imp_vol based on the price given
         self._vol = vol 
@@ -282,7 +317,7 @@ class SPYOption(Option) :
         self._vol_surface = vol_surface
         self.price = price
 
-        
+    
     @property
     def code(self) :
         return self._code
