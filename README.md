@@ -16,6 +16,9 @@
 
 ![Initial](https://github.com/gcedism/portfolio/blob/main/docs/initial_setup.png "Initial")
 
+- Portfolio Implementation : 
+![portfolio](https://github.com/gcedism/portfolio/blob/main/docs/portfolio.png "portfolio")
+
 ### Features
 
 - Breakdown of assets in Asset Classes / Currencies
@@ -34,10 +37,10 @@
 - Performance Attribution for different Asset Classes
 ![Performance Attribution](https://github.com/gcedism/portfolio/blob/main/docs/perf%20attribution.png "Performance Attribution")
 
-- Cash
+- Portfolio Cash Breakdown :
 ![Cash](https://github.com/gcedism/portfolio/blob/main/docs/cash.png "cash")
 
-- currencies
+- Portfolio Currencies Breakdown
 ![currencies](https://github.com/gcedism/portfolio/blob/main/docs/currencies.png "currencies")
 
 - Equities
