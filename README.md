@@ -14,7 +14,7 @@
     + Asset Class products : list of products to be used in the Securities object
     + Securities : description of all securities with all calculattions (used from the Portfolio.securities)
 
-![Initial](https://github.com/gcedism/portfolio/blob/main/docs/intial_setup.png "Initial")
+![Initial](https://github.com/gcedism/portfolio/blob/main/docs/initial_setup.png "Initial")
 
 ### Features
 
