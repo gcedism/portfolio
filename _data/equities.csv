@@ -1,5 +1,5 @@
-,name,currency
-BMO.TO,Bank of Montreal,CAD
-CM.TO,Canadian Imperial Bank,CAD
-RY.TO,Royal Bank of Canada,CAD
-VALE,Vale,USD
+,name,currency,asset_class
+BMO.TO,Bank of Montreal,CAD,equities
+CM.TO,Canadian Imperial Bank,CAD,equities
+RY.TO,Royal Bank of Canada,CAD,equities
+VALE,Vale,USD,equities

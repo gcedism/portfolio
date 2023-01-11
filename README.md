@@ -3,41 +3,59 @@
 
 ## IMPLEMENTED : Newton-Rhapson for BOND SPREAD calculation
 
-### Portfolio of financial securities with features that include :
+---
+### Initial Set Up : 
 
-- Snapshot with positions with current value
+- Portfolio needs to receive the following information :
+    + Pricing Date : Initial Pricing date of the portfolio
+    + Hist : Object with historical prices (used from the Portfolio.utils)
+    + US Zero Curve : Curve to be used to calculate Bond Spreads (from Portfolio.utils)
+    + Volatilities : Object with volatilities for options (used from the Portfolio.utils)
+    + Asset Class products : list of products to be used in the Securities object
+    + Securities : description of all securities with all calculattions (used from the Portfolio.securities)
+
+![Initial](https://github.com/gcedism/portfolio/blob/main/docs/intial_setup.png "Initial")
+
+### Features
+
 - Breakdown of assets in Asset Classes / Currencies
-- Performance with a given window
-- Risk measures : v@r for now
-- Performance Attribution for different Asset Classes
-- Cash Flow projection
+![AllAssets](https://github.com/gcedism/portfolio/blob/main/docs/all_assets.png "Assets")
 
-### Securities files implement different Calculations for all Securities : 
+- Daily pnl Report
+![Pnl](https://github.com/gcedism/portfolio/blob/main/docs/pnlReport.png "Pnl")
+
+- Expected Cash Flow
+![CashFlow](https://github.com/gcedism/portfolio/blob/main/docs/Cashflow1.png "Cashflow")
+![CashFlow](https://github.com/gcedism/portfolio/blob/main/docs/Cashflow2.png "Cashflow")
+
+- Historical Performance
+![Performance](https://github.com/gcedism/portfolio/blob/main/docs/performance.png "Performance")
+
+- Performance Attribution for different Asset Classes
+![Performance Attribution](https://github.com/gcedism/portfolio/blob/main/docs/perf%20attribution.png "Performance Attribution")
+
+- Cash
+![Cash](https://github.com/gcedism/portfolio/blob/main/docs/cash.png "cash")
+
+- currencies
+![currencies](https://github.com/gcedism/portfolio/blob/main/docs/currencies.png "currencies")
+
+- Equities
+![equities](https://github.com/gcedism/portfolio/blob/main/docs/equities.png "equities")
 
 - Bonds
-- Equities
-- Funds
-
-### Inputs
-Portfolio needs to received some pricing feeder for the securities and a Blotter containing all trades executed
+![bonds](https://github.com/gcedism/portfolio/blob/main/docs/bonds.png "bonds")
 
 
 ### US Zero Curve calculation :
 
-- Calculates using bootstrapp from US Treasury curves only
-- To be implemented using swaps and Eurodollar
-- Missing source for US Treasury curve 
+- Calculates using bootstrapp from US Treasury curves
+- Using Deposits and Treasury
 
-### Some screenshots : 
-
-Options
+### Options
 
 ![Options Greek management](https://github.com/gcedism/portfolio/blob/main/docs/options%20port.png "Options")
 
-Performance Attribution
-![Performance Attribution](https://github.com/gcedism/portfolio/blob/main/docs/perf%20attribution.png "Performance Attribution")
 
 
-Total Performance
-![Performance](https://github.com/gcedism/portfolio/blob/main/docs/performance.png "Performance")
 
